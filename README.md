@@ -4,15 +4,15 @@ A minimal working prototype of the P13 web app, with **fake sensor data** so you
 
 ## What this includes
 
-- **`frontend/`** — Vue 3 + Vite + Tailwind + PrimeVue + ApexCharts, single dashboard page
-- **`backend/`** — FastAPI with fake sensor generator, REST endpoints, basic JWT auth
+- **`frontend/`** - Vue 3 + Vite + Tailwind + PrimeVue + ApexCharts, single dashboard page
+- **`backend/`** - FastAPI with fake sensor generator, REST endpoints, basic JWT auth
 
 ## What this does NOT include yet
 
-- Real MQTT integration (replaced with fake data generator — a `FakeSensorService` you swap out later)
+- Real MQTT integration (replaced with fake data generator - a `FakeSensorService` you swap out later)
 - Real Postgres (uses in-memory storage for the prototype)
-- Two view modes (simple/advanced) — only one view, add this once the basics work
-- Persistent users — there's a single hardcoded test user
+- Two view modes (simple/advanced) - only one view, add this once the basics work
+- Persistent users - there's a single hardcoded test user
 
 The goal of this version: get something running on your laptop in 10 minutes so you can see the pieces fit together. Replace fake bits one at a time.
 
@@ -26,7 +26,7 @@ source .venv/bin/activate     # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
-Backend runs on http://localhost:8000 — visit http://localhost:8000/docs for the auto-generated Swagger UI.
+Backend runs on http://localhost:8000 - visit http://localhost:8000/docs for the auto-generated Swagger UI.
 
 ### Frontend
 ```bash

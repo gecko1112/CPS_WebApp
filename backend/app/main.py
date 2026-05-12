@@ -21,15 +21,16 @@ from .auth import (
     require_operator,
 )
 from .sensors import sensor_service
+from .alerts import alert_service
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: kick off the fake sensor generator
     await sensor_service.start()
+    await alert_service.start()
     yield
-    # Shutdown: stop the background task cleanly
     await sensor_service.stop()
+    await alert_service.stop()
 
 
 app = FastAPI(
@@ -94,6 +95,28 @@ async def history(
 @app.get("/api/system/status")
 async def system_status(_: User = Depends(get_current_user)):
     return sensor_service.system_status()
+
+
+# ---------------------------------------------------------------------------
+# Alerts (read-only — any authenticated user)
+# ---------------------------------------------------------------------------
+# ── MQTT INTEGRATION POINT ────────────────────────────────────────────────
+# In production these endpoints just read from alert_service, which is
+# populated by the aiomqtt subscriber listening on alerts/<plant_id>.
+# No changes needed here — swap out the fake loop in alerts.py instead.
+# ─────────────────────────────────────────────────────────────────────────
+
+@app.get("/api/alerts/active")
+async def active_alerts(_: User = Depends(get_current_user)):
+    return alert_service.active_alerts
+
+
+@app.get("/api/alerts/recent")
+async def recent_alerts(
+    limit: int = 20,
+    _: User = Depends(get_current_user),
+):
+    return alert_service.recent_alerts[:limit]
 
 
 # ---------------------------------------------------------------------------

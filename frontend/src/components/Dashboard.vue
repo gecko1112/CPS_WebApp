@@ -8,11 +8,13 @@ import { api, authState, logout } from '../composables/useApi'
 import SensorCard from './SensorCard.vue'
 import StatusBanner from './StatusBanner.vue'
 import HistoryChart from './HistoryChart.vue'
+import AlertPanel from './AlertPanel.vue'
 
 const latest = ref({ moisture: null, temperature: null, tank_level: null })
 const status = ref(null)
 const moistureHistory = ref([])
 const tempHistory = ref([])
+const activeAlerts = ref([])
 
 const showConfirm = ref(false)
 const watering = ref(false)
@@ -24,21 +26,28 @@ let pollInterval = null
 
 async function refresh() {
   try {
-    const [l, s, mh, th] = await Promise.all([
+    const [l, s, mh, th, alerts] = await Promise.all([
       api.latest(),
       api.status(),
       api.history('moisture'),
       api.history('temperature'),
+      api.alerts.active(),
     ])
     latest.value = l
     status.value = s
     moistureHistory.value = mh
     tempHistory.value = th
+    activeAlerts.value = alerts
   } catch (e) {
     error.value = e.message
     // If auth expired, kick back to login
     if (e.message.startsWith('401')) logout()
   }
+}
+
+function dismissAlert(id) {
+  // Visual-only dismiss — real resolution comes from the MQTT clear event
+  activeAlerts.value = activeAlerts.value.filter(a => a.id !== id)
 }
 
 async function confirmWater() {
@@ -98,6 +107,9 @@ function fmt(v) {
     <main class="max-w-5xl mx-auto p-4 space-y-4">
       <!-- Status banner -->
       <StatusBanner :status="status" />
+
+      <!-- Anomaly alerts — prominent, above everything else when active -->
+      <AlertPanel :alerts="activeAlerts" @dismiss="dismissAlert" />
 
       <!-- Sensor cards: 1 col on mobile, 3 cols on desktop -->
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
