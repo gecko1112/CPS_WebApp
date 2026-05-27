@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
@@ -25,21 +25,17 @@ from .sensors import sensor_service
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: kick off the fake sensor generator
     await sensor_service.start()
     yield
-    # Shutdown: stop the background task cleanly
     await sensor_service.stop()
 
 
 app = FastAPI(
     title="Plant CPS API (Prototype)",
-    version="0.1.0",
+    version="0.2.0",
     lifespan=lifespan,
 )
 
-# CORS — allow the Vite dev server to talk to us during development.
-# In production, lock this down to the actual frontend origin.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
@@ -73,11 +69,11 @@ async def me(user: User = Depends(get_current_user)):
 
 
 # ---------------------------------------------------------------------------
-# Sensors (read-only — any authenticated user)
+# Sensors — all authenticated users
 # ---------------------------------------------------------------------------
 @app.get("/api/sensors/latest")
 async def latest(_: User = Depends(get_current_user)):
-    return sensor_service.latest
+    return sensor_service.get_latest()
 
 
 @app.get("/api/sensors/history")
@@ -97,10 +93,27 @@ async def system_status(_: User = Depends(get_current_user)):
 
 
 # ---------------------------------------------------------------------------
-# Commands (operator only)
+# Alerts — matches P08 AnomalyAlert shape
+# ---------------------------------------------------------------------------
+@app.get("/api/alerts/active")
+async def alerts_active(_: User = Depends(get_current_user)):
+    return sensor_service.active_alerts
+
+
+@app.get("/api/alerts/recent")
+async def alerts_recent(
+    limit: int = Query(default=20, ge=1, le=100),
+    _: User = Depends(get_current_user),
+):
+    return list(sensor_service.recent_alerts)[:limit]
+
+
+# ---------------------------------------------------------------------------
+# Commands — operator only
 # ---------------------------------------------------------------------------
 class WaterRequest(BaseModel):
     confirm: bool = False
+    duration_s: int = 30
 
 
 @app.post("/api/commands/water")
@@ -112,9 +125,13 @@ async def trigger_water(
             status_code=400,
             detail="Manual watering requires explicit confirmation (confirm=true)",
         )
+    if req.duration_s < 1 or req.duration_s > 3600:
+        raise HTTPException(
+            status_code=400,
+            detail="duration_s must be between 1 and 3600",
+        )
     sensor_service.trigger_watering()
-    # In the real system: publish to MQTT topic commands/water/<plant_id>
-    return {"ok": True, "triggered_by": user.username}
+    return {"ok": True, "triggered_by": user.username, "duration_s": req.duration_s}
 
 
 @app.get("/")

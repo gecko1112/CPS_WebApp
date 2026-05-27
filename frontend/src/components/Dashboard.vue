@@ -2,15 +2,22 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
-import { Droplet, Thermometer, Container, LogOut, Sprout } from 'lucide-vue-next'
+import {
+  Droplet, Thermometer, Container,
+  BatteryCharging, CloudRain, Cpu,
+} from 'lucide-vue-next'
 
 import { api, authState, logout } from '../composables/useApi'
+import router from '../router'
+import AppHeader from './AppHeader.vue'
 import SensorCard from './SensorCard.vue'
 import StatusBanner from './StatusBanner.vue'
 import HistoryChart from './HistoryChart.vue'
+import AlertPanel from './AlertPanel.vue'
 
-const latest = ref({ moisture: null, temperature: null, tank_level: null })
+const latest = ref(null)
 const status = ref(null)
+const alerts = ref([])
 const moistureHistory = ref([])
 const tempHistory = ref([])
 
@@ -24,20 +31,21 @@ let pollInterval = null
 
 async function refresh() {
   try {
-    const [l, s, mh, th] = await Promise.all([
+    const [l, s, a, mh, th] = await Promise.all([
       api.latest(),
       api.status(),
+      api.alertsActive(),
       api.history('moisture'),
       api.history('temperature'),
     ])
     latest.value = l
     status.value = s
+    alerts.value = a
     moistureHistory.value = mh
     tempHistory.value = th
   } catch (e) {
     error.value = e.message
-    // If auth expired, kick back to login
-    if (e.message.startsWith('401')) logout()
+    if (e.message.startsWith('401')) { logout(); router.push('/login') }
   }
 }
 
@@ -56,7 +64,6 @@ async function confirmWater() {
 
 onMounted(() => {
   refresh()
-  // Poll every 3s in dev — bump to 10s+ in production
   pollInterval = setInterval(refresh, 3000)
 })
 
@@ -64,103 +71,137 @@ onUnmounted(() => {
   if (pollInterval) clearInterval(pollInterval)
 })
 
+function pct(v) {
+  return v == null ? '—' : (v * 100).toFixed(1)
+}
 function fmt(v) {
   return v == null ? '—' : v.toFixed(1)
+}
+function fmtHours(h) {
+  if (h == null) return '—'
+  if (h < 1) return `${Math.round(h * 60)}min`
+  if (h < 48) return `${h.toFixed(0)}h`
+  return `${(h / 24).toFixed(1)}d`
 }
 </script>
 
 <template>
-  <div class="min-h-screen">
-    <!-- Header -->
-    <header class="bg-white border-b border-slate-200 sticky top-0 z-10">
-      <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          <div class="bg-emerald-100 p-1.5 rounded-lg">
-            <Sprout class="w-5 h-5 text-emerald-600" />
+  <div class="min-h-screen bg-plant-950 relative overflow-hidden">
+    <!-- Background blobs -->
+    <div class="fixed inset-0 overflow-hidden pointer-events-none">
+      <div class="blob w-[500px] h-[500px] bg-plant-800/30 -top-32 -right-32" style="animation-delay: -3s" />
+      <div class="blob w-[400px] h-[400px] bg-plant-600/20 bottom-0 -left-32" style="animation-delay: -12s" />
+    </div>
+
+    <div class="relative z-10">
+      <AppHeader transparent />
+
+      <main class="max-w-5xl mx-auto p-4 space-y-4">
+        <!-- Status banner -->
+        <StatusBanner :status="status" />
+
+        <!-- Alerts panel -->
+        <AlertPanel :alerts="alerts" />
+
+        <!-- Primary sensor cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+          <SensorCard
+            label="Soil moisture"
+            :value="latest ? pct(latest.soil_moisture.calibrated) : '—'"
+            unit="%"
+            :icon="Droplet"
+            tone="emerald"
+          />
+          <SensorCard
+            label="Temperature"
+            :value="latest ? fmt(latest.weather.temperature_c) : '—'"
+            unit="°C"
+            :icon="Thermometer"
+            tone="amber"
+          />
+          <SensorCard
+            label="Water tank"
+            :value="latest ? fmt(latest.tank.level_pct) : '—'"
+            unit="%"
+            :icon="Container"
+            tone="sky"
+          />
+        </div>
+
+        <!-- Secondary info cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+          <SensorCard
+            label="Controller"
+            :value="latest ? latest.controller.state : '—'"
+            unit=""
+            :icon="Cpu"
+            tone="violet"
+          />
+          <SensorCard
+            label="Rain forecast"
+            :value="latest && latest.weather.status === 'fresh' ? fmt(latest.weather.rainfall_mm) : '—'"
+            unit="mm"
+            :icon="CloudRain"
+            tone="blue"
+          />
+          <SensorCard
+            label="Battery"
+            :value="latest ? fmt(latest.power.battery_soc) : '—'"
+            unit="%"
+            :icon="BatteryCharging"
+            tone="lime"
+          />
+        </div>
+
+        <!-- Tank time-to-empty + manual watering -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+          <div class="glass rounded-2xl p-4 sm:p-5">
+            <p class="text-sm text-white/50 mb-1">Tank time to empty</p>
+            <p class="text-2xl font-bold text-white">
+              {{ latest ? fmtHours(latest.tank_forecast.time_to_empty_h) : '—' }}
+            </p>
           </div>
-          <h1 class="font-bold text-slate-900">Plant CPS</h1>
-          <span class="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 ml-2">
-            {{ authState.role }}
-          </span>
+
+          <div class="glass rounded-2xl p-4 sm:p-5 flex items-center justify-between gap-3">
+            <div>
+              <p class="font-semibold text-white">Manual watering</p>
+              <p class="text-sm text-white/50">
+                {{ isOperator ? 'Trigger a watering cycle now.' : 'Operator role required.' }}
+              </p>
+            </div>
+            <Button
+              label="Water now"
+              :disabled="!isOperator"
+              @click="showConfirm = true"
+              class="!bg-plant-600 !border-plant-600 hover:!bg-plant-500 !rounded-xl shrink-0"
+            >
+              <Droplet class="w-4 h-4 mr-2" />
+              Water now
+            </Button>
+          </div>
         </div>
-        <Button
-          severity="secondary"
-          text
-          size="small"
-          @click="logout"
-          aria-label="Logout"
-        >
-          <LogOut class="w-4 h-4" />
-        </Button>
-      </div>
-    </header>
 
-    <main class="max-w-5xl mx-auto p-4 space-y-4">
-      <!-- Status banner -->
-      <StatusBanner :status="status" />
-
-      <!-- Sensor cards: 1 col on mobile, 3 cols on desktop -->
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-        <SensorCard
-          label="Soil moisture"
-          :value="fmt(latest.moisture)"
-          unit="%"
-          :icon="Droplet"
-          tone="emerald"
-        />
-        <SensorCard
-          label="Temperature"
-          :value="fmt(latest.temperature)"
-          unit="°C"
-          :icon="Thermometer"
-          tone="amber"
-        />
-        <SensorCard
-          label="Water tank"
-          :value="fmt(latest.tank_level)"
-          unit="%"
-          :icon="Container"
-          tone="sky"
-        />
-      </div>
-
-      <!-- Action button -->
-      <div class="bg-white rounded-2xl shadow-sm p-4 sm:p-5 flex items-center justify-between gap-3">
-        <div>
-          <p class="font-semibold text-slate-900">Manual watering</p>
-          <p class="text-sm text-slate-500">
-            {{ isOperator ? 'Trigger a watering cycle now.' : 'Operator role required.' }}
-          </p>
+        <!-- Charts -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <HistoryChart
+            title="Soil moisture (live)"
+            :series="moistureHistory"
+            color="#34d399"
+            unit="%"
+            dark
+          />
+          <HistoryChart
+            title="Temperature (live)"
+            :series="tempHistory"
+            color="#fbbf24"
+            unit="°C"
+            dark
+          />
         </div>
-        <Button
-          label="Water now"
-          severity="success"
-          :disabled="!isOperator"
-          @click="showConfirm = true"
-        >
-          <Droplet class="w-4 h-4 mr-2" />
-          Water now
-        </Button>
-      </div>
 
-      <!-- Charts -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <HistoryChart
-          title="Soil moisture (live)"
-          :series="moistureHistory"
-          color="#10b981"
-          unit="%"
-        />
-        <HistoryChart
-          title="Temperature (live)"
-          :series="tempHistory"
-          color="#f59e0b"
-          unit="°C"
-        />
-      </div>
-
-      <p v-if="error" class="text-sm text-rose-600">{{ error }}</p>
-    </main>
+        <p v-if="error" class="text-sm text-rose-400">{{ error }}</p>
+      </main>
+    </div>
 
     <!-- Confirmation dialog -->
     <Dialog
@@ -174,7 +215,12 @@ function fmt(v) {
       </p>
       <div class="flex justify-end gap-2">
         <Button label="Cancel" severity="secondary" text @click="showConfirm = false" />
-        <Button label="Yes, water now" severity="success" :loading="watering" @click="confirmWater" />
+        <Button
+          label="Yes, water now"
+          :loading="watering"
+          @click="confirmWater"
+          class="!bg-plant-600 !border-plant-600 hover:!bg-plant-500"
+        />
       </div>
     </Dialog>
   </div>

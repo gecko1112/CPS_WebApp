@@ -61,9 +61,11 @@ export const api = {
   history: (sensor, maxPoints = 200) =>
     request(`/api/sensors/history?sensor=${sensor}&max_points=${maxPoints}`),
   status: () => request('/api/system/status'),
-  water: () =>
+  alertsActive: () => request('/api/alerts/active'),
+  alertsRecent: (limit = 20) => request(`/api/alerts/recent?limit=${limit}`),
+  water: (durationS = 30) =>
     request('/api/commands/water', {
       method: 'POST',
-      body: JSON.stringify({ confirm: true }),
+      body: JSON.stringify({ confirm: true, duration_s: durationS }),
     }),
 }

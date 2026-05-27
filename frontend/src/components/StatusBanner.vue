@@ -3,19 +3,19 @@ import { CheckCircle2, AlertTriangle, AlertOctagon } from 'lucide-vue-next'
 import { computed } from 'vue'
 
 const props = defineProps({
-  status: Object, // { level, message, last_watered_at }
+  status: Object,
 })
 
 const config = computed(() => {
   switch (props.status?.level) {
     case 'ok':
-      return { icon: CheckCircle2, bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-800', iconColor: 'text-emerald-600' }
+      return { icon: CheckCircle2, bg: 'bg-emerald-500/15', border: 'border-emerald-500/30', text: 'text-emerald-300', iconColor: 'text-emerald-400' }
     case 'warning':
-      return { icon: AlertTriangle, bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-800', iconColor: 'text-amber-600' }
+      return { icon: AlertTriangle, bg: 'bg-amber-500/15', border: 'border-amber-500/30', text: 'text-amber-300', iconColor: 'text-amber-400' }
     case 'error':
-      return { icon: AlertOctagon, bg: 'bg-rose-50', border: 'border-rose-200', text: 'text-rose-800', iconColor: 'text-rose-600' }
+      return { icon: AlertOctagon, bg: 'bg-rose-500/15', border: 'border-rose-500/30', text: 'text-rose-300', iconColor: 'text-rose-400' }
     default:
-      return { icon: CheckCircle2, bg: 'bg-slate-50', border: 'border-slate-200', text: 'text-slate-800', iconColor: 'text-slate-600' }
+      return { icon: CheckCircle2, bg: 'bg-white/5', border: 'border-white/10', text: 'text-white/60', iconColor: 'text-white/40' }
   }
 })
 
@@ -34,7 +34,7 @@ const lastWateredText = computed(() => {
     <component :is="config.icon" :class="[config.iconColor, 'w-6 h-6 shrink-0 mt-0.5']" />
     <div class="min-w-0">
       <p :class="[config.text, 'font-semibold']">{{ status.message }}</p>
-      <p class="text-sm text-slate-600 mt-0.5">{{ lastWateredText }}</p>
+      <p class="text-sm text-white/40 mt-0.5">{{ lastWateredText }}</p>
     </div>
   </div>
 </template>
