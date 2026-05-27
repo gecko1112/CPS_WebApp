@@ -20,6 +20,7 @@ const status = ref(null)
 const alerts = ref([])
 const moistureHistory = ref([])
 const tempHistory = ref([])
+const activeAlerts = ref([])
 
 const showConfirm = ref(false)
 const watering = ref(false)
@@ -37,16 +38,23 @@ async function refresh() {
       api.alertsActive(),
       api.history('moisture'),
       api.history('temperature'),
+      api.alerts.active(),
     ])
     latest.value = l
     status.value = s
     alerts.value = a
     moistureHistory.value = mh
     tempHistory.value = th
+    activeAlerts.value = alerts
   } catch (e) {
     error.value = e.message
     if (e.message.startsWith('401')) { logout(); router.push('/login') }
   }
+}
+
+function dismissAlert(id) {
+  // Visual-only dismiss — real resolution comes from the MQTT clear event
+  activeAlerts.value = activeAlerts.value.filter(a => a.id !== id)
 }
 
 async function confirmWater() {

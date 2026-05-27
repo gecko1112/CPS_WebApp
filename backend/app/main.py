@@ -21,13 +21,16 @@ from .auth import (
     require_operator,
 )
 from .sensors import sensor_service
+from .alerts import alert_service
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await sensor_service.start()
+    await alert_service.start()
     yield
     await sensor_service.stop()
+    await alert_service.stop()
 
 
 app = FastAPI(
