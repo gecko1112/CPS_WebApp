@@ -68,13 +68,4 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ confirm: true, duration_s: durationS }),
     }),
-
-  // ── MQTT INTEGRATION POINT ──────────────────────────────────────────────
-  // These endpoints are already wired — no frontend changes needed when
-  // the backend swaps the fake alert loop for real MQTT messages.
-  // ────────────────────────────────────────────────────────────────────────
-  alerts: {
-    active: () => request('/api/alerts/active'),
-    recent: (limit = 20) => request(`/api/alerts/recent?limit=${limit}`),
-  },
 }
