@@ -27,6 +27,9 @@ build/
 .env.local
 .env.*.local
 
+# SQLite database (created at runtime)
+backend/data/
+
 # IDE / editor
 .vscode/
 .idea/

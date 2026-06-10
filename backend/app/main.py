@@ -13,19 +13,24 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from .auth import (
     User,
     authenticate,
     create_access_token,
     get_current_user,
+    init_db,
     require_operator,
 )
+from .db import get_session
 from .sensors import sensor_service
 from .alerts import alert_service
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    await init_db()
     await sensor_service.start()
     await alert_service.start()
     yield
@@ -58,8 +63,11 @@ class TokenResponse(BaseModel):
 
 
 @app.post("/api/auth/login", response_model=TokenResponse)
-async def login(form: OAuth2PasswordRequestForm = Depends()):
-    user = authenticate(form.username, form.password)
+async def login(
+    form: OAuth2PasswordRequestForm = Depends(),
+    session: AsyncSession = Depends(get_session),
+):
+    user = await authenticate(session, form.username, form.password)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
     token = create_access_token(user)
