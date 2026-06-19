@@ -8,7 +8,7 @@ import { Sprout } from 'lucide-vue-next'
 import { login } from '../composables/useApi'
 import router from '../router'
 
-const username = ref('')
+const email = ref('')
 const password = ref('')
 const error = ref('')
 const loading = ref(false)
@@ -17,11 +17,11 @@ async function submit() {
   error.value = ''
   loading.value = true
   try {
-    await login(username.value, password.value)
+    await login(email.value, password.value)
     const preferred = localStorage.getItem('plantcps_landing') || 'welcome'
     router.push({ name: preferred })
   } catch (e) {
-    error.value = 'Login failed. Check username and password.'
+    error.value = 'Login failed. Check email and password.'
   } finally {
     loading.value = false
   }
@@ -49,8 +49,8 @@ async function submit() {
 
       <form @submit.prevent="submit" class="space-y-4">
         <div>
-          <label class="block text-sm font-medium text-white/70 mb-1">Username</label>
-          <InputText v-model="username" class="w-full" autocomplete="username" />
+          <label class="block text-sm font-medium text-white/70 mb-1">Email</label>
+          <InputText v-model="email" type="email" class="w-full" autocomplete="email" />
         </div>
         <div>
           <label class="block text-sm font-medium text-white/70 mb-1">Password</label>
@@ -76,8 +76,8 @@ async function submit() {
 
       <div class="mt-6 pt-4 border-t border-white/10 text-xs text-white/40">
         <p class="font-semibold mb-1 text-white/60">Test accounts:</p>
-        <p>viewer / viewer123 — read only</p>
-        <p>operator / operator123 — can water</p>
+        <p>viewer@example.com / viewer123 — read only</p>
+        <p>operator@example.com / operator123 — can water</p>
       </div>
     </div>
   </div>

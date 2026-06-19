@@ -1,7 +1,7 @@
 """
 FastAPI entry point for the Plant CPS prototype.
 
-Run with:  uvicorn app.main:app --reload
+Run with:  uv run uvicorn app.main:app --reload
 Docs at:   http://localhost:8000/docs
 """
 from __future__ import annotations
@@ -10,20 +10,17 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from .auth import (
-    User,
-    authenticate,
-    create_access_token,
-    get_current_user,
+    auth_backend,
+    current_active_user,
+    fastapi_users,
     init_db,
     require_operator,
 )
-from .db import get_session
+from .models import User
+from .schemas import UserCreate, UserRead, UserUpdate
 from .sensors import sensor_service
 from .alerts import alert_service
 
@@ -40,7 +37,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Plant CPS API (Prototype)",
-    version="0.2.0",
+    version="0.3.0",
     lifespan=lifespan,
 )
 
@@ -54,36 +51,30 @@ app.add_middleware(
 
 
 # ---------------------------------------------------------------------------
-# Auth
+# Auth (fastapi-users)
 # ---------------------------------------------------------------------------
-class TokenResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-    role: str
-
-
-@app.post("/api/auth/login", response_model=TokenResponse)
-async def login(
-    form: OAuth2PasswordRequestForm = Depends(),
-    session: AsyncSession = Depends(get_session),
-):
-    user = await authenticate(session, form.username, form.password)
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    token = create_access_token(user)
-    return TokenResponse(access_token=token, role=user.role)
-
-
-@app.get("/api/auth/me", response_model=User)
-async def me(user: User = Depends(get_current_user)):
-    return user
+app.include_router(
+    fastapi_users.get_auth_router(auth_backend),
+    prefix="/api/auth/jwt",
+    tags=["auth"],
+)
+app.include_router(
+    fastapi_users.get_register_router(UserRead, UserCreate),
+    prefix="/api/auth",
+    tags=["auth"],
+)
+app.include_router(
+    fastapi_users.get_users_router(UserRead, UserUpdate),
+    prefix="/api/users",
+    tags=["users"],
+)
 
 
 # ---------------------------------------------------------------------------
 # Sensors — all authenticated users
 # ---------------------------------------------------------------------------
 @app.get("/api/sensors/latest")
-async def latest(_: User = Depends(get_current_user)):
+async def latest(_: User = Depends(current_active_user)):
     return sensor_service.get_latest()
 
 
@@ -91,7 +82,7 @@ async def latest(_: User = Depends(get_current_user)):
 async def history(
     sensor: str,
     max_points: int = 200,
-    _: User = Depends(get_current_user),
+    _: User = Depends(current_active_user),
 ):
     if sensor not in ("moisture", "temperature", "tank_level"):
         raise HTTPException(status_code=400, detail="Unknown sensor")
@@ -99,7 +90,7 @@ async def history(
 
 
 @app.get("/api/system/status")
-async def system_status(_: User = Depends(get_current_user)):
+async def system_status(_: User = Depends(current_active_user)):
     return sensor_service.system_status()
 
 
@@ -107,14 +98,14 @@ async def system_status(_: User = Depends(get_current_user)):
 # Alerts — matches P08 AnomalyAlert shape
 # ---------------------------------------------------------------------------
 @app.get("/api/alerts/active")
-async def alerts_active(_: User = Depends(get_current_user)):
+async def alerts_active(_: User = Depends(current_active_user)):
     return sensor_service.active_alerts
 
 
 @app.get("/api/alerts/recent")
 async def alerts_recent(
     limit: int = Query(default=20, ge=1, le=100),
-    _: User = Depends(get_current_user),
+    _: User = Depends(current_active_user),
 ):
     return list(sensor_service.recent_alerts)[:limit]
 
@@ -142,7 +133,7 @@ async def trigger_water(
             detail="duration_s must be between 1 and 3600",
         )
     sensor_service.trigger_watering()
-    return {"ok": True, "triggered_by": user.username, "duration_s": req.duration_s}
+    return {"ok": True, "triggered_by": user.email, "duration_s": req.duration_s}
 
 
 @app.get("/")

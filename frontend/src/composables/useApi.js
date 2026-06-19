@@ -34,20 +34,41 @@ async function request(path, options = {}) {
   return res.json()
 }
 
-export async function login(username, password) {
-  // FastAPI's OAuth2PasswordRequestForm expects form-encoded, NOT JSON
-  const body = new URLSearchParams({ username, password })
-  const res = await fetch('/api/auth/login', {
+export async function login(email, password) {
+  // fastapi-users uses OAuth2 conventions: the form field is called "username"
+  // even though we send an email. Login URL is /api/auth/jwt/login.
+  const body = new URLSearchParams({ username: email, password })
+  const res = await fetch('/api/auth/jwt/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body,
   })
   if (!res.ok) throw new Error('Invalid credentials')
-  const data = await res.json()
-  authState.value = { token: data.access_token, role: data.role }
-  localStorage.setItem(TOKEN_KEY, data.access_token)
-  localStorage.setItem(ROLE_KEY, data.role)
-  return data
+  const { access_token } = await res.json()
+
+  // Token in hand — now fetch /me to discover the role.
+  authState.value = { token: access_token, role: null }
+  const me = await fetch('/api/users/me', {
+    headers: { Authorization: `Bearer ${access_token}` },
+  }).then((r) => r.json())
+
+  authState.value = { token: access_token, role: me.role, email: me.email }
+  localStorage.setItem(TOKEN_KEY, access_token)
+  localStorage.setItem(ROLE_KEY, me.role)
+  return { access_token, role: me.role, email: me.email }
+}
+
+export async function register(email, password) {
+  const res = await fetch('/api/auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  })
+  if (!res.ok) {
+    const detail = await res.text()
+    throw new Error(detail || 'Registration failed')
+  }
+  return res.json()
 }
 
 export function logout() {
