@@ -1,238 +1,282 @@
 """
-FakeSensorService — generates plausible sensor readings for development.
+P06SensorService — feeds the dashboard from P06's query API.
 
-Data shapes match the real Sparkplug B schema models from the monorepo
-(schema.p01, schema.p05, schema.p07, schema.p08, schema.p11, schema.p12)
-so the REST API responses won't change when we swap in real MQTT.
+Replaces the old FakeSensorService. It polls P06 on a fixed interval and caches
+the latest reading per topic in the exact JSON shapes the REST API already
+served, so the frontend is unchanged. History is fetched from P06 on demand.
+
+Topic + metric names come from the canonical ``cps-schema`` package — never
+hardcoded — so an upstream rename breaks at import (fail fast).
+
+The manual-watering command is a separate WRITE path (MQTT to P05) and is not
+implemented here yet — see ``trigger_watering``.
 """
+
 from __future__ import annotations
 
 import asyncio
-import math
-import random
+import json
+import logging
+import os
 from collections import deque
-from datetime import datetime, timezone
-from typing import Deque
+from datetime import UTC, datetime, timedelta
+
+import schema.p01 as p01
+import schema.p03 as p03
+import schema.p05 as p05
+import schema.p07 as p07
+import schema.p08 as p08
+import schema.p11 as p11
+import schema.p12 as p12
+
+from .p06_client import P06Client, group_events, latest_values, metric_series
+
+log = logging.getLogger("p13.sensors")
+
+POLL_INTERVAL_S = float(os.getenv("POLL_INTERVAL_S", "10"))
+ACTIVE_ALERT_WINDOW_MIN = float(os.getenv("ACTIVE_ALERT_WINDOW_MIN", "10"))
+
+# Sensors exposed by /api/sensors/history -> (topic, measurement, value scale).
+# Soil is scaled 0–1 -> 0–100 % to match the previous chart units.
+_HISTORY_SOURCES: dict[str, tuple[str, str, float]] = {
+    "moisture": (
+        p01.SoilReadingTopic.address,
+        p01.SoilMoistureReading.METRIC_CALIBRATED,
+        100.0,
+    ),
+    "tank_level": (p11.LevelTopic.address, p11.TankLevelReading.METRIC_LEVEL_PCT, 1.0),
+    "temperature": (
+        p03.BME280Topic.address,
+        p03.EnvironmentBME280.METRIC_TEMPERATURE_C,
+        1.0,
+    ),
+}
 
 
-def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+def _num(value: object) -> float | None:
+    return value if isinstance(value, (int, float)) else None
 
 
-# Alert templates matching P08 AnomalyAlert shape
-_ALERT_TEMPLATES = [
-    {
-        "component": "p01/soil_moisture",
-        "alert_type": "sensor_fault",
-        "severity": "warning",
-        "observed_value": "0.01",
-        "description": "Soil moisture reading near zero — possible sensor disconnection or dry-air exposure",
-    },
-    {
-        "component": "p01/soil_moisture",
-        "alert_type": "process_fault",
-        "severity": "warning",
-        "observed_value": "0.42",
-        "description": "Soil moisture unchanged after watering completed — check water delivery path",
-    },
-    {
-        "component": "p02/pump",
-        "alert_type": "sensor_fault",
-        "severity": "critical",
-        "observed_value": "running_for_120s",
-        "description": "Pump running longer than commanded duration — possible valve or relay stuck open",
-    },
-    {
-        "component": "p11/tank_level",
-        "alert_type": "sensor_fault",
-        "severity": "warning",
-        "observed_value": "105.3",
-        "description": "Tank level sensor reading exceeds 100% — recalibration needed",
-    },
-    {
-        "component": "p05/controller",
-        "alert_type": "system_fault",
-        "severity": "critical",
-        "observed_value": "silent_for_30s",
-        "description": "Watering controller missed heartbeat — node may be offline",
-    },
-]
-
-
-class FakeSensorService:
-    def __init__(self, history_size: int = 2880):
-        # --- P01: Soil Moisture (calibrated 0.0–1.0) ---
+class P06SensorService:
+    def __init__(self) -> None:
+        # Latest-reading cache. Same keys the frontend already consumes;
+        # initialised to "no data yet" until the first successful poll.
         self.soil_moisture = {
-            "calibrated": 0.45,
-            "raw_adc": 1847,
-            "status": "ok",
-            "timestamp": _now(),
+            "calibrated": None,
+            "raw_adc": None,
+            "status": "unavailable",
+            "timestamp": None,
         }
-
-        # --- P05: Controller State ---
-        self.controller = {
-            "state": "idle",
-            "reason": None,
-            "timestamp": _now(),
-        }
-
-        # --- P07: Weather Forecast ---
+        self.controller = {"state": "unknown", "reason": None, "timestamp": None}
         self.weather = {
-            "rainfall_mm": 2.5,
-            "temperature_c": 22.0,
+            "rainfall_mm": None,
+            "temperature_c": None,
             "horizon_label": "+24h",
-            "evapotranspiration_mm_day": None,
-            "staleness_hours": None,
-            "confidence": 0.85,
-            "status": "fresh",
-            "timestamp": _now(),
+            "confidence": None,
+            "status": "unavailable",
+            "timestamp": None,
         }
-
-        # --- P11: Tank Level ---
         self.tank = {
-            "level_pct": 78.0,
-            "volume_l": 15.6,
-            "sensor_distance_mm": 120.0,
-            "status": "ok",
-            "timestamp": _now(),
+            "level_pct": None,
+            "volume_l": None,
+            "sensor_distance_mm": None,
+            "status": "unavailable",
+            "timestamp": None,
         }
         self.tank_forecast = {
-            "time_to_empty_h": 72.0,
-            "confidence_h": 6.0,
-            "status": "ok",
-            "timestamp": _now(),
+            "time_to_empty_h": None,
+            "confidence_h": None,
+            "status": "unavailable",
+            "timestamp": None,
         }
-
-        # --- P12: Power / Battery ---
         self.power = {
-            "battery_soc": 85.0,
-            "charging_rate_w": 12.5,
-            "time_to_discharge_h": 48.0,
-            "mode": "normal",
-            "status": "ok",
-            "timestamp": _now(),
+            "battery_soc": None,
+            "charging_rate_w": None,
+            "time_to_discharge_h": None,
+            "mode": "unknown",
+            "status": "unavailable",
+            "timestamp": None,
         }
 
-        # --- P08: Anomaly Alerts ---
         self.active_alerts: list[dict] = []
         self.recent_alerts: deque[dict] = deque(maxlen=50)
 
-        # --- History ring buffers ---
-        self.history: dict[str, Deque[dict]] = {
-            "moisture": deque(maxlen=history_size),
-            "temperature": deque(maxlen=history_size),
-            "tank_level": deque(maxlen=history_size),
-        }
-
         self.last_watered_at: datetime | None = None
+        self._connected = False
+        self._client: P06Client | None = None
         self._task: asyncio.Task | None = None
-        self._tick = 0
 
-    async def start(self):
-        self._task = asyncio.create_task(self._generate_loop())
+    # -- lifecycle ----------------------------------------------------------
 
-    async def stop(self):
+    async def start(self) -> None:
+        self._client = P06Client()
+        self._task = asyncio.create_task(self._poll_loop())
+
+    async def stop(self) -> None:
         if self._task:
             self._task.cancel()
             try:
                 await self._task
             except asyncio.CancelledError:
                 pass
+        if self._client:
+            await self._client.aclose()
 
-    async def _generate_loop(self):
+    async def _poll_loop(self) -> None:
         while True:
-            self._tick += 1
-            now = _now()
+            try:
+                await self._poll_once()
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:  # noqa: BLE001 — never kill the loop
+                self._connected = False
+                log.warning("P06 poll cycle failed: %s", exc)
+            await asyncio.sleep(POLL_INTERVAL_S)
 
-            # --- Soil moisture drift ---
-            drift = -0.001 + random.uniform(-0.002, 0.002)
-            cal = max(0.05, min(0.95, self.soil_moisture["calibrated"] + drift))
-            self.soil_moisture.update({
-                "calibrated": round(cal, 4),
-                "raw_adc": int(cal * 4095),
-                "status": "ok",
-                "timestamp": now,
-            })
+    async def _poll_once(self) -> None:
+        assert self._client is not None
+        c = self._client
+        # Fetch P06 health + all latest windows + the alert log concurrently.
+        # window()/history() swallow errors and return [], so connectivity is
+        # judged from /health, not from whether a cycle raised.
+        (
+            health,
+            soil,
+            ctrl,
+            tank,
+            forecast,
+            power,
+            weather,
+            anomalies,
+        ) = await asyncio.gather(
+            c.health(),
+            c.window(p01.SoilReadingTopic.address),
+            c.window(p05.ControllerStateTopic.address),
+            c.window(p11.LevelTopic.address),
+            c.window(p11.ForecastTopic.address),
+            c.window(p12.PowerReadingTopic.address),
+            c.window(p07.ForecastTopic.address, start="-6h"),  # 2 h cadence
+            c.history(p08.AnomalyAlertTopic.address, hours=24, downsample=None),
+        )
+        self._connected = bool(health)
 
-            # --- Controller state ---
-            self.controller["timestamp"] = now
+        self._apply_soil(latest_values(soil))
+        self._apply_controller(latest_values(ctrl))
+        self._apply_tank(latest_values(tank))
+        self._apply_tank_forecast(latest_values(forecast))
+        self._apply_power(latest_values(power))
+        self._apply_weather(latest_values(weather))
+        self._apply_alerts(group_events(anomalies))
 
-            # --- Weather: slow drift, update every ~60 ticks ---
-            if self._tick % 60 == 0:
-                self.weather.update({
-                    "rainfall_mm": round(random.uniform(0.0, 8.0), 1),
-                    "temperature_c": round(18.0 + random.uniform(-3.0, 8.0), 1),
-                    "confidence": round(random.uniform(0.6, 0.95), 2),
-                    "status": "fresh",
-                    "timestamp": now,
-                })
+    # -- latest-reading mappers (only overwrite when P06 returned data) -----
 
-            # --- Tank level: slowly decreases ---
-            lvl = max(0.0, self.tank["level_pct"] - random.uniform(0.0, 0.03))
-            self.tank.update({
-                "level_pct": round(lvl, 2),
-                "volume_l": round(lvl * 0.2, 2),
-                "sensor_distance_mm": round(300.0 - lvl * 2.5, 1),
-                "status": "ok",
-                "timestamp": now,
-            })
-            tte = lvl * 1.5 if lvl > 0 else 0.0
-            self.tank_forecast.update({
-                "time_to_empty_h": round(tte, 1),
-                "confidence_h": round(tte * 0.1, 1) if tte > 0 else None,
-                "status": "ok",
-                "timestamp": now,
-            })
+    def _apply_soil(self, v: dict) -> None:
+        if not v.get("timestamp"):
+            return
+        self.soil_moisture = {
+            "calibrated": _num(v.get("calibrated")),
+            "raw_adc": v.get("raw_adc"),
+            "status": v.get("status", "ok"),
+            "timestamp": v.get("timestamp"),
+        }
 
-            # --- Power: sinusoidal charging ---
-            charge = 10.0 + 8.0 * max(0, math.sin(self._tick / 200.0))
-            soc = min(100.0, max(0.0, self.power["battery_soc"] + random.uniform(-0.1, 0.15)))
-            self.power.update({
-                "battery_soc": round(soc, 1),
-                "charging_rate_w": round(charge, 1),
-                "time_to_discharge_h": round(soc * 0.8, 1),
-                "mode": "normal" if soc > 30 else ("low_power" if soc > 10 else "critical"),
-                "status": "ok",
-                "timestamp": now,
-            })
+    def _apply_controller(self, v: dict) -> None:
+        if not v.get("timestamp"):
+            return
+        state = v.get("state", "unknown")
+        self.controller = {
+            "state": state,
+            "reason": None,
+            "timestamp": v.get("timestamp"),
+        }
+        # Approximate "last watered" from the controller heartbeat.
+        if state in ("watering", "soaking"):
+            self.last_watered_at = datetime.now(UTC)
 
-            # --- Fake alerts: ~5% chance per tick to fire one ---
-            if random.random() < 0.05 and len(self.active_alerts) < 3:
-                template = random.choice(_ALERT_TEMPLATES)
-                alert = {**template, "timestamp": now}
-                self.active_alerts.append(alert)
-                self.recent_alerts.appendleft(alert)
+    def _apply_tank(self, v: dict) -> None:
+        if not v.get("timestamp"):
+            return
+        self.tank = {
+            "level_pct": _num(v.get("level_pct")),
+            "volume_l": _num(v.get("volume_l")),
+            "sensor_distance_mm": _num(v.get("sensor_distance_mm")),
+            "status": v.get("status", "ok"),
+            "timestamp": v.get("timestamp"),
+        }
 
-            # Clear oldest active alert after a while
-            if self._tick % 30 == 0 and self.active_alerts:
-                self.active_alerts.pop(0)
+    def _apply_tank_forecast(self, v: dict) -> None:
+        if not v.get("timestamp"):
+            return
+        self.tank_forecast = {
+            "time_to_empty_h": _num(v.get("time_to_empty_h")),
+            "confidence_h": _num(v.get("confidence_h")),
+            "status": v.get("status", "ok"),
+            "timestamp": v.get("timestamp"),
+        }
 
-            # --- History ---
-            self.history["moisture"].append(
-                {"t": now, "v": round(cal * 100, 2)}
-            )
-            self.history["temperature"].append(
-                {"t": now, "v": round(self.weather["temperature_c"], 2)}
-            )
-            self.history["tank_level"].append(
-                {"t": now, "v": round(lvl, 2)}
-            )
+    def _apply_power(self, v: dict) -> None:
+        if not v.get("timestamp"):
+            return
+        self.power = {
+            "battery_soc": _num(v.get("battery_soc")),
+            "charging_rate_w": _num(v.get("charging_rate_w")),
+            "time_to_discharge_h": _num(v.get("time_to_discharge_h")),
+            "mode": v.get("mode", "unknown"),
+            "status": v.get("status", "ok"),
+            "timestamp": v.get("timestamp"),
+        }
 
-            await asyncio.sleep(2.0)
+    def _apply_weather(self, v: dict) -> None:
+        """P07 ships the useful numbers inside a JSON-encoded ``forecast_hours``
+        metric (stored as a string by P06). Parse it best-effort."""
+        if not v.get("timestamp"):
+            return
+        temperature_c: float | None = None
+        rainfall_mm: float | None = None
+        raw_hours = v.get("forecast_hours")
+        if isinstance(raw_hours, str):
+            try:
+                hours = json.loads(raw_hours)
+                if hours:
+                    temperature_c = _num(hours[0].get("temperature_c"))
+                    rainfall_mm = round(
+                        sum(
+                            float(h.get("precipitation_mm", 0) or 0) for h in hours[:24]
+                        ),
+                        1,
+                    )
+            except (ValueError, TypeError, AttributeError):
+                pass
+        self.weather = {
+            "rainfall_mm": rainfall_mm,
+            "temperature_c": temperature_c,
+            "horizon_label": "+24h",
+            "confidence": None,
+            "status": v.get("status", "unavailable"),
+            "timestamp": v.get("timestamp"),
+        }
 
-    def trigger_watering(self):
-        cal = min(0.95, self.soil_moisture["calibrated"] + 0.25)
-        self.soil_moisture.update({
-            "calibrated": round(cal, 4),
-            "raw_adc": int(cal * 4095),
-        })
-        self.tank["level_pct"] = max(0.0, self.tank["level_pct"] - 2.0)
-        self.last_watered_at = datetime.now(timezone.utc)
-        self.controller.update({
-            "state": "watering",
-            "reason": "manual_trigger",
-            "timestamp": _now(),
-        })
+    def _apply_alerts(self, events: list[dict]) -> None:
+        # Newest first, matching the old fake service ordering.
+        ordered = list(reversed(events))
+        self.recent_alerts = deque(ordered[:50], maxlen=50)
+        cutoff = (
+            datetime.now(UTC) - timedelta(minutes=ACTIVE_ALERT_WINDOW_MIN)
+        ).isoformat()
+        self.active_alerts = [
+            e for e in ordered if (e.get("timestamp") or "") >= cutoff
+        ]
+
+    # -- write path (manual watering) ---------------------------------------
+
+    def trigger_watering(self) -> None:
+        # TODO(mqtt): publish schema.p05.ManualWateringTrigger to
+        # p05.ManualTriggerCommandTopic over MQTT (Sparkplug B). See the
+        # MQTT watering-publisher task. Until then this is a no-op so the
+        # endpoint exists but does not fake a state change (data is now real).
+        log.warning("trigger_watering called but MQTT publisher is not wired yet")
+
+    # -- read API (unchanged shapes) ----------------------------------------
 
     def get_latest(self) -> dict:
         return {
@@ -244,30 +288,39 @@ class FakeSensorService:
             "power": {**self.power},
         }
 
-    def get_history(self, sensor: str, max_points: int = 200) -> list[dict]:
-        if sensor not in self.history:
+    async def get_history(self, sensor: str, max_points: int = 200) -> list[dict]:
+        source = _HISTORY_SOURCES.get(sensor)
+        if source is None or self._client is None:
             return []
-        full = list(self.history[sensor])
-        if len(full) <= max_points:
-            return full
-        step = len(full) / max_points
-        return [full[int(i * step)] for i in range(max_points)]
+        topic, measurement, scale = source
+        rows = await self._client.history(topic, hours=24, downsample="5m")
+        pts = metric_series(rows, measurement, scale=scale)
+        if len(pts) > max_points:
+            step = len(pts) / max_points
+            pts = [pts[int(i * step)] for i in range(max_points)]
+        return pts
 
     def system_status(self) -> dict:
-        cal = self.soil_moisture["calibrated"]
-        tank = self.tank["level_pct"]
-        ctrl = self.controller["state"]
+        cal = _num(self.soil_moisture.get("calibrated"))
+        tank = _num(self.tank.get("level_pct"))
+        ctrl = self.controller.get("state", "unknown")
         n_alerts = len(self.active_alerts)
+        has_critical = any(a.get("severity") == "critical" for a in self.active_alerts)
 
-        if ctrl == "error":
+        if not self._connected:
+            level, message = (
+                "warning",
+                "No data from logger (P06) — check the connection",
+            )
+        elif ctrl == "error":
             level, message = "error", "Controller in error state"
-        elif n_alerts > 0 and any(a["severity"] == "critical" for a in self.active_alerts):
+        elif has_critical:
             level, message = "error", "Critical alert active"
-        elif tank < 10:
+        elif tank is not None and tank < 10:
             level, message = "error", "Water tank almost empty"
-        elif cal < 0.20:
+        elif cal is not None and cal < 0.20:
             level, message = "warning", "Soil is dry — watering soon"
-        elif tank < 25:
+        elif tank is not None and tank < 25:
             level, message = "warning", "Tank level getting low"
         elif n_alerts > 0:
             level, message = "warning", f"{n_alerts} alert(s) active"
@@ -285,4 +338,4 @@ class FakeSensorService:
         }
 
 
-sensor_service = FakeSensorService()
+sensor_service = P06SensorService()

@@ -2,7 +2,7 @@
 name = "plant-cps-backend"
 version = "0.2.0"
 description = "FastAPI backend for the P13 Plant CPS web app"
-requires-python = ">=3.12"
+requires-python = ">=3.13"
 dependencies = [
     "fastapi==0.115.0",
     "uvicorn[standard]==0.32.0",
@@ -13,7 +13,15 @@ dependencies = [
     "python-dotenv==1.0.1",
     "fastapi-users[sqlalchemy]>=14.0.0",
     "fastapi-mail>=1.4.1",
+    "httpx>=0.27",
+    "cps-schema",
 ]
 
 [tool.uv]
 package = false
+
+# cps-schema is the shared monorepo package (sibling checkout). Editable install
+# so dashboard reads can import the canonical topic/metric constants. In the
+# monorepo deployment it is resolved as a uv workspace member instead.
+[tool.uv.sources]
+cps-schema = { path = "../../monorepo/src/schema", editable = true }

@@ -4,6 +4,7 @@ FastAPI entry point for the Plant CPS prototype.
 Run with:  uv run uvicorn app.main:app --reload
 Docs at:   http://localhost:8000/docs
 """
+
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
@@ -15,6 +16,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from .alerts import alert_service
 from .auth import (
     auth_backend,
     current_active_user,
@@ -25,7 +27,6 @@ from .auth import (
 from .models import User
 from .schemas import UserCreate, UserRead, UserUpdate
 from .sensors import sensor_service
-from .alerts import alert_service
 
 
 @asynccontextmanager
@@ -89,7 +90,7 @@ async def history(
 ):
     if sensor not in ("moisture", "temperature", "tank_level"):
         raise HTTPException(status_code=400, detail="Unknown sensor")
-    return sensor_service.get_history(sensor, max_points=max_points)
+    return await sensor_service.get_history(sensor, max_points=max_points)
 
 
 @app.get("/api/system/status")
@@ -122,9 +123,7 @@ class WaterRequest(BaseModel):
 
 
 @app.post("/api/commands/water")
-async def trigger_water(
-    req: WaterRequest, user: User = Depends(require_operator)
-):
+async def trigger_water(req: WaterRequest, user: User = Depends(require_operator)):
     if not req.confirm:
         raise HTTPException(
             status_code=400,
