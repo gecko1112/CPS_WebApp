@@ -7,9 +7,12 @@ Docs at:   http://localhost:8000/docs
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from .auth import (
@@ -136,6 +139,35 @@ async def trigger_water(
     return {"ok": True, "triggered_by": user.email, "duration_s": req.duration_s}
 
 
-@app.get("/")
-async def root():
-    return {"service": "Plant CPS Prototype", "docs": "/docs"}
+# ---------------------------------------------------------------------------
+# Static frontend (single-process serving for the monorepo / Pi deployment).
+#
+# When a built Vue app is present next to this package (a `static/` dir created
+# by the monorepo export script), serve it directly and fall back to index.html
+# for client-side routes (vue-router runs in history mode).
+#
+# In standalone dev there is no `static/` dir, so this block is skipped: the
+# Vite dev server (port 5173) serves the frontend and proxies /api here.
+# ---------------------------------------------------------------------------
+_STATIC_DIR = Path(__file__).resolve().parent / "static"
+
+if _STATIC_DIR.is_dir():
+    _ASSETS_DIR = _STATIC_DIR / "assets"
+    if _ASSETS_DIR.is_dir():
+        app.mount("/assets", StaticFiles(directory=_ASSETS_DIR), name="assets")
+
+    @app.get("/{full_path:path}")
+    async def spa_fallback(full_path: str):
+        # Never let the SPA catch-all swallow unmatched API routes.
+        if full_path.startswith("api"):
+            raise HTTPException(status_code=404, detail="Not found")
+        candidate = _STATIC_DIR / full_path
+        if full_path and candidate.is_file():
+            return FileResponse(candidate)
+        return FileResponse(_STATIC_DIR / "index.html")
+
+else:
+
+    @app.get("/")
+    async def root():
+        return {"service": "Plant CPS Prototype", "docs": "/docs"}
