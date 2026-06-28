@@ -7,6 +7,7 @@ Docs at:   http://localhost:8000/docs
 
 from __future__ import annotations
 
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -24,18 +25,31 @@ from .auth import (
     require_operator,
 )
 from .models import User
-from .mqtt_publisher import watering_publisher
 from .schemas import UserCreate, UserRead, UserUpdate
-from .sensors import sensor_service
+
+# Data source toggle. Real mode reads from P06's query API and publishes manual
+# watering over MQTT. Demo mode (MOCK_DATA=true) uses a self-contained mock with
+# NO cps-schema / P06 / MQTT dependency, so it runs standalone for live demos.
+MOCK_DATA = os.getenv("MOCK_DATA", "false").lower() in ("1", "true", "yes", "on")
+
+if MOCK_DATA:
+    from .mock_data import mock_service as sensor_service
+
+    watering_publisher = None
+else:
+    from .mqtt_publisher import watering_publisher
+    from .sensors import sensor_service
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
     await sensor_service.start()
-    watering_publisher.start()
+    if watering_publisher is not None:
+        watering_publisher.start()
     yield
-    watering_publisher.stop()
+    if watering_publisher is not None:
+        watering_publisher.stop()
     await sensor_service.stop()
 
 
@@ -138,13 +152,16 @@ async def trigger_water(req: WaterRequest, user: User = Depends(require_operator
             detail="duration_s must be between 1 and 3600",
         )
     duration = req.duration_s if req.action == "start" else None
-    try:
-        result = watering_publisher.publish_watering(req.action, duration)
-    except RuntimeError as exc:
-        raise HTTPException(
-            status_code=503,
-            detail=f"Watering command could not be sent: {exc}",
-        ) from exc
+    if watering_publisher is None:  # demo / mock mode — no broker
+        result = sensor_service.trigger_watering(req.action, duration)
+    else:
+        try:
+            result = watering_publisher.publish_watering(req.action, duration)
+        except RuntimeError as exc:
+            raise HTTPException(
+                status_code=503,
+                detail=f"Watering command could not be sent: {exc}",
+            ) from exc
     return {
         "ok": True,
         "triggered_by": user.email,
