@@ -8,8 +8,8 @@ served, so the frontend is unchanged. History is fetched from P06 on demand.
 Topic + metric names come from the canonical ``cps-schema`` package — never
 hardcoded — so an upstream rename breaks at import (fail fast).
 
-The manual-watering command is a separate WRITE path (MQTT to P05) and is not
-implemented here yet — see ``trigger_watering``.
+The manual-watering command is a separate WRITE path (MQTT to P05) and lives in
+``mqtt_publisher.py`` — this service is read-only.
 """
 
 from __future__ import annotations
@@ -266,15 +266,6 @@ class P06SensorService:
         self.active_alerts = [
             e for e in ordered if (e.get("timestamp") or "") >= cutoff
         ]
-
-    # -- write path (manual watering) ---------------------------------------
-
-    def trigger_watering(self) -> None:
-        # TODO(mqtt): publish schema.p05.ManualWateringTrigger to
-        # p05.ManualTriggerCommandTopic over MQTT (Sparkplug B). See the
-        # MQTT watering-publisher task. Until then this is a no-op so the
-        # endpoint exists but does not fake a state change (data is now real).
-        log.warning("trigger_watering called but MQTT publisher is not wired yet")
 
     # -- read API (unchanged shapes) ----------------------------------------
 

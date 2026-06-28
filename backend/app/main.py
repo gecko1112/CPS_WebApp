@@ -25,6 +25,7 @@ from .auth import (
     require_operator,
 )
 from .models import User
+from .mqtt_publisher import watering_publisher
 from .schemas import UserCreate, UserRead, UserUpdate
 from .sensors import sensor_service
 
@@ -34,7 +35,9 @@ async def lifespan(app: FastAPI):
     await init_db()
     await sensor_service.start()
     await alert_service.start()
+    watering_publisher.start()
     yield
+    watering_publisher.stop()
     await sensor_service.stop()
     await alert_service.stop()
 
@@ -119,6 +122,7 @@ async def alerts_recent(
 # ---------------------------------------------------------------------------
 class WaterRequest(BaseModel):
     confirm: bool = False
+    action: str = "start"
     duration_s: int = 30
 
 
@@ -129,13 +133,28 @@ async def trigger_water(req: WaterRequest, user: User = Depends(require_operator
             status_code=400,
             detail="Manual watering requires explicit confirmation (confirm=true)",
         )
-    if req.duration_s < 1 or req.duration_s > 3600:
+    if req.action not in ("start", "stop"):
+        raise HTTPException(status_code=400, detail="action must be 'start' or 'stop'")
+    if req.action == "start" and not (1 <= req.duration_s <= 3600):
         raise HTTPException(
             status_code=400,
             detail="duration_s must be between 1 and 3600",
         )
-    sensor_service.trigger_watering()
-    return {"ok": True, "triggered_by": user.email, "duration_s": req.duration_s}
+    duration = req.duration_s if req.action == "start" else None
+    try:
+        result = watering_publisher.publish_watering(req.action, duration)
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Watering command could not be sent: {exc}",
+        ) from exc
+    return {
+        "ok": True,
+        "triggered_by": user.email,
+        "action": req.action,
+        "duration_s": duration,
+        **result,
+    }
 
 
 # ---------------------------------------------------------------------------
