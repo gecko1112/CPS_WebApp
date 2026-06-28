@@ -28,8 +28,22 @@ async function request(path, options = {}) {
     },
   })
   if (!res.ok) {
-    const detail = await res.text()
-    throw new Error(`${res.status}: ${detail}`)
+    // FastAPI returns {"detail": "..."} — surface that as a clean message.
+    let detail = await res.text()
+    try {
+      const parsed = JSON.parse(detail)
+      if (parsed?.detail) {
+        detail =
+          typeof parsed.detail === 'string'
+            ? parsed.detail
+            : JSON.stringify(parsed.detail)
+      }
+    } catch {
+      /* response body was not JSON — keep the raw text */
+    }
+    const err = new Error(detail || `Request failed (${res.status})`)
+    err.status = res.status
+    throw err
   }
   return res.json()
 }
@@ -84,9 +98,9 @@ export const api = {
   status: () => request('/api/system/status'),
   alertsActive: () => request('/api/alerts/active'),
   alertsRecent: (limit = 20) => request(`/api/alerts/recent?limit=${limit}`),
-  water: (durationS = 30) =>
+  water: (durationS = 30, action = 'start') =>
     request('/api/commands/water', {
       method: 'POST',
-      body: JSON.stringify({ confirm: true, duration_s: durationS }),
+      body: JSON.stringify({ confirm: true, action, duration_s: durationS }),
     }),
 }

@@ -16,7 +16,6 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from .alerts import alert_service
 from .auth import (
     auth_backend,
     current_active_user,
@@ -34,12 +33,10 @@ from .sensors import sensor_service
 async def lifespan(app: FastAPI):
     await init_db()
     await sensor_service.start()
-    await alert_service.start()
     watering_publisher.start()
     yield
     watering_publisher.stop()
     await sensor_service.stop()
-    await alert_service.stop()
 
 
 app = FastAPI(

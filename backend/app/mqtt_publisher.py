@@ -50,6 +50,14 @@ CLIENT_ID = os.getenv("MQTT_CLIENT_ID", "p13-app-main")
 ENABLED = os.getenv("MQTT_ENABLED", "true").lower() in ("1", "true", "yes", "on")
 PUBLISH_TIMEOUT_S = float(os.getenv("MQTT_PUBLISH_TIMEOUT_S", "5"))
 
+# Lifecycle topic resolution across schema versions. Newer cps-schema merges the
+# birth + death certificates into a single ``InfoTopic`` (NINFO); older schema
+# exposes separate ``BirthTopic`` / ``DeathTopic``. Support both via the
+# imported constants so we never hardcode the address.
+_INFO_TOPIC = getattr(p13, "InfoTopic", None)
+_BIRTH_TOPIC = getattr(p13, "BirthTopic", None) or _INFO_TOPIC
+_DEATH_TOPIC = getattr(p13, "DeathTopic", None) or _INFO_TOPIC
+
 
 def _build_nbirth(seq: SequenceCounter, bd_seq: BirthDeathCounter) -> SparkplugPayload:
     """Minimal NBIRTH for a node with no domain metrics: reset seq to 0 and
@@ -84,10 +92,10 @@ class WateringPublisher:
         # Register the LWT (NDEATH) before connecting so the broker publishes it
         # on an unexpected drop.
         client.will_set(
-            p13.DeathTopic.address,
+            _DEATH_TOPIC.address,
             codec.encode(death_payload(self._bd_seq)),
-            qos=p13.DeathTopic.qos,
-            retain=p13.DeathTopic.retain,
+            qos=_DEATH_TOPIC.qos,
+            retain=_DEATH_TOPIC.retain,
         )
         # connect_async + loop_start: non-blocking, auto-retries, so app startup
         # never blocks or crashes when the broker is down.
@@ -114,10 +122,10 @@ class WateringPublisher:
         if reason_code == 0:
             self._connected = True
             client.publish(
-                p13.BirthTopic.address,
+                _BIRTH_TOPIC.address,
                 codec.encode(_build_nbirth(self._seq, self._bd_seq)),
-                qos=p13.BirthTopic.qos,
-                retain=p13.BirthTopic.retain,
+                qos=_BIRTH_TOPIC.qos,
+                retain=_BIRTH_TOPIC.retain,
             )
             log.info("MQTT connected to %s:%s; NBIRTH published", BROKER, PORT)
         else:

@@ -17,6 +17,8 @@ const latest = ref(null)
 const alerts = ref([])
 const showConfirm = ref(false)
 const watering = ref(false)
+const error = ref('')
+const success = ref('')
 
 const isOperator = computed(() => authState.value.role === 'operator')
 
@@ -37,12 +39,19 @@ async function refresh() {
 
 async function confirmWater() {
   watering.value = true
+  error.value = ''
   try {
     await api.water()
     showConfirm.value = false
+    success.value = 'Watering command sent.'
+    setTimeout(() => { success.value = '' }, 4000)
     await refresh()
-  } catch { /* ignore */ }
-  finally { watering.value = false }
+  } catch (e) {
+    showConfirm.value = false
+    error.value = e.message
+  } finally {
+    watering.value = false
+  }
 }
 
 onMounted(() => {
@@ -201,6 +210,9 @@ function fmt(v) {
           Water Now
         </Button>
       </div>
+
+      <p v-if="error" class="mt-3 text-sm text-rose-400">{{ error }}</p>
+      <p v-if="success" class="mt-3 text-sm text-plant-300">{{ success }}</p>
     </main>
 
     <!-- Water confirmation dialog -->

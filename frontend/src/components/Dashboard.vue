@@ -23,6 +23,7 @@ const tempHistory = ref([])
 const showConfirm = ref(false)
 const watering = ref(false)
 const error = ref('')
+const success = ref('')
 
 const isOperator = computed(() => authState.value.role === 'operator')
 
@@ -44,17 +45,21 @@ async function refresh() {
     tempHistory.value = th
   } catch (e) {
     error.value = e.message
-    if (e.message.startsWith('401')) { logout(); router.push('/login') }
+    if (e.status === 401) { logout(); router.push('/login') }
   }
 }
 
 async function confirmWater() {
   watering.value = true
+  error.value = ''
   try {
     await api.water()
     showConfirm.value = false
+    success.value = 'Watering command sent.'
+    setTimeout(() => { success.value = '' }, 4000)
     await refresh()
   } catch (e) {
+    showConfirm.value = false
     error.value = e.message
   } finally {
     watering.value = false
@@ -199,6 +204,7 @@ function fmtHours(h) {
         </div>
 
         <p v-if="error" class="text-sm text-rose-400">{{ error }}</p>
+        <p v-if="success" class="text-sm text-plant-300">{{ success }}</p>
       </main>
     </div>
 
