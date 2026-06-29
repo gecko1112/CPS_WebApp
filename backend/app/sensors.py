@@ -328,5 +328,48 @@ class P06SensorService:
             "active_alert_count": n_alerts,
         }
 
+    # -- watering history + plant profile (real mode: honest stubs) ---------
+
+    def get_watering_history(self, limit: int = 20) -> list[dict]:
+        # TODO(p06): derive watering events (idle -> watering transitions) from
+        # P06's controller-state history once that query path is available.
+        return []
+
+    def get_watering_config(self) -> dict:
+        # Profile definitions mirror P05's profiles/*.json. We can't read the
+        # *active* profile or change it until P05 exposes/accepts that (issue:
+        # P05 integration), so editing is disabled in real mode.
+        return {
+            "active": None,
+            "profiles": {
+                "tomato": {
+                    "target_moist": 0.45,
+                    "dry_days": 2,
+                    "suppress_daytime": True,
+                },
+                "cactus": {
+                    "target_moist": 0.15,
+                    "dry_days": 10,
+                    "suppress_daytime": False,
+                },
+                "herbs": {
+                    "target_moist": 0.55,
+                    "dry_days": 1,
+                    "suppress_daytime": True,
+                },
+            },
+            "editable": False,
+            "note": "Plant profile control requires P05 integration (not wired yet).",
+        }
+
+    def update_watering_config(
+        self, active: str | None = None, profiles: dict | None = None
+    ) -> dict:
+        # P05 owns the profiles; editing them needs a P05 command path which
+        # isn't wired yet. Fail honestly so the UI shows it's read-only.
+        raise NotImplementedError(
+            "Editing watering profiles requires a P05 command (not wired yet)."
+        )
+
 
 sensor_service = P06SensorService()

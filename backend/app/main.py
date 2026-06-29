@@ -172,6 +172,43 @@ async def trigger_water(req: WaterRequest, user: User = Depends(require_operator
 
 
 # ---------------------------------------------------------------------------
+# Watering history + plant profile (questionnaire-driven: watering history was
+# the #1 advanced-view ask; plant profiles came from P05).
+# ---------------------------------------------------------------------------
+@app.get("/api/watering/history")
+async def watering_history(
+    limit: int = Query(default=20, ge=1, le=100),
+    _: User = Depends(current_active_user),
+):
+    return sensor_service.get_watering_history(limit)
+
+
+@app.get("/api/config/watering")
+async def watering_config(_: User = Depends(current_active_user)):
+    return sensor_service.get_watering_config()
+
+
+class WateringConfigUpdate(BaseModel):
+    active: str | None = None
+    profiles: dict | None = None
+
+
+@app.patch("/api/config/watering")
+async def update_watering_config(
+    req: WateringConfigUpdate, user: User = Depends(require_operator)
+):
+    try:
+        result = sensor_service.update_watering_config(
+            active=req.active, profiles=req.profiles
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except NotImplementedError as exc:
+        raise HTTPException(status_code=501, detail=str(exc)) from exc
+    return {"ok": True, "updated_by": user.email, **result}
+
+
+# ---------------------------------------------------------------------------
 # Static frontend (single-process serving for the monorepo / Pi deployment).
 #
 # When a built Vue app is present next to this package (a `static/` dir created

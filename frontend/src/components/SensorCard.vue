@@ -5,6 +5,7 @@ defineProps({
   unit: String,
   icon: Object,
   tone: { type: String, default: 'slate' },
+  sub: { type: String, default: '' }, // raw/detail line shown in advanced view
 })
 
 const toneClasses = {
@@ -29,6 +30,7 @@ const toneClasses = {
       <p class="text-2xl sm:text-3xl font-bold text-white">
         {{ value }}<span class="text-base font-medium text-white/30 ml-0.5">{{ unit }}</span>
       </p>
+      <p v-if="sub" class="text-xs text-white/35 mt-0.5 font-mono truncate">{{ sub }}</p>
     </div>
   </div>
 </template>

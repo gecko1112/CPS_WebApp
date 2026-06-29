@@ -19,11 +19,20 @@ import asyncio
 import math
 import random
 from collections import deque
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 
 def _now() -> str:
     return datetime.now(tz=UTC).isoformat()
+
+
+# Plant watering profiles (mirrors P05's profiles/*.json: target_moist 0–1,
+# dry_days = min days between waterings, suppress_daytime = water at night only).
+_PLANT_PROFILES = {
+    "tomato": {"target_moist": 0.45, "dry_days": 2, "suppress_daytime": True},
+    "cactus": {"target_moist": 0.15, "dry_days": 10, "suppress_daytime": False},
+    "herbs": {"target_moist": 0.55, "dry_days": 1, "suppress_daytime": True},
+}
 
 
 # Rotating anomaly alerts (P08 AnomalyAlert shape) shown during the demo.
@@ -106,6 +115,29 @@ class MockSensorService:
         self.last_watered_at: datetime | None = None
         self._task: asyncio.Task | None = None
         self._tick = 0
+
+        # Plant profile (owned by P05; we only display + forward edits). In demo
+        # mode we keep an editable in-memory copy so the UI is fully functional.
+        self.active_profile = "tomato"
+        self.profiles = {name: dict(v) for name, v in _PLANT_PROFILES.items()}
+        now = datetime.now(tz=UTC)
+        self.watering_events: deque[dict] = deque(
+            [
+                {
+                    "timestamp": (now - timedelta(hours=h)).isoformat(),
+                    "duration_s": dur,
+                    "trigger": trig,
+                    "moisture_before": mb,
+                    "moisture_after": ma,
+                }
+                for h, dur, trig, mb, ma in (
+                    (6, 30, "auto", 0.31, 0.56),
+                    (18, 25, "auto", 0.29, 0.52),
+                    (30, 45, "manual", 0.22, 0.61),
+                )
+            ],
+            maxlen=50,
+        )
 
     # -- lifecycle ----------------------------------------------------------
 
@@ -224,11 +256,45 @@ class MockSensorService:
             self.controller.update(
                 {"state": "watering", "reason": "manual_trigger", "timestamp": _now()}
             )
+            self.watering_events.appendleft(
+                {
+                    "timestamp": self.last_watered_at.isoformat(),
+                    "duration_s": duration_s or 30,
+                    "trigger": "manual",
+                    "moisture_before": round(cal - 0.25, 4),
+                    "moisture_after": round(cal, 4),
+                }
+            )
         else:
             self.controller.update(
                 {"state": "idle", "reason": "manual_stop", "timestamp": _now()}
             )
         return {"topic": "mock://p05/manual_trigger", "seq": self._tick}
+
+    # -- watering history + plant profile -----------------------------------
+
+    def get_watering_history(self, limit: int = 20) -> list[dict]:
+        return list(self.watering_events)[:limit]
+
+    def get_watering_config(self) -> dict:
+        return {
+            "active": self.active_profile,
+            "profiles": self.profiles,
+            "editable": True,
+        }
+
+    def update_watering_config(
+        self, active: str | None = None, profiles: dict | None = None
+    ) -> dict:
+        # In real mode this would publish to P05; in demo mode we just apply it
+        # locally so operators can see selection + value edits take effect.
+        if profiles is not None:
+            self.profiles = profiles
+        if active is not None:
+            if active not in self.profiles:
+                raise ValueError(f"unknown profile '{active}'")
+            self.active_profile = active
+        return self.get_watering_config()
 
     # -- read API (identical shapes to P06SensorService) --------------------
 

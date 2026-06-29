@@ -5,6 +5,7 @@ import Button from 'primevue/button'
 import { Sprout, LogOut, LayoutDashboard, Settings } from 'lucide-vue-next'
 
 import { authState, logout } from '../composables/useApi'
+import { viewMode, setViewMode } from '../composables/useViewMode'
 import router from '../router'
 
 const route = useRoute()
@@ -69,6 +70,29 @@ function doLogout() {
       </div>
 
       <div v-if="isLoggedIn" class="flex items-center gap-2">
+        <!-- Simple / Advanced view toggle (UI preference, separate from role) -->
+        <div
+          :class="[
+            'flex items-center rounded-lg p-0.5 text-xs font-medium',
+            transparent ? 'bg-white/10' : 'bg-slate-100',
+          ]"
+        >
+          <button
+            v-for="m in ['simple', 'advanced']"
+            :key="m"
+            type="button"
+            @click="setViewMode(m)"
+            :class="[
+              'px-2.5 py-1 rounded-md capitalize transition-colors',
+              viewMode === m
+                ? (transparent ? 'bg-white/25 text-white' : 'bg-white text-plant-700 shadow-sm')
+                : (transparent ? 'text-white/60 hover:text-white' : 'text-slate-500 hover:text-slate-800'),
+            ]"
+          >
+            {{ m }}
+          </button>
+        </div>
+
         <span
           :class="[
             'text-xs px-2 py-0.5 rounded-full',

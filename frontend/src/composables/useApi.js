@@ -103,4 +103,12 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ confirm: true, action, duration_s: durationS }),
     }),
+  wateringHistory: (limit = 20) =>
+    request(`/api/watering/history?limit=${limit}`),
+  wateringConfig: () => request('/api/config/watering'),
+  updateWateringConfig: (payload) =>
+    request('/api/config/watering', {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
 }

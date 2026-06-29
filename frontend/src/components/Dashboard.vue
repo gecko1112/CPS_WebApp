@@ -8,44 +8,66 @@ import {
 } from 'lucide-vue-next'
 
 import { api, authState, logout } from '../composables/useApi'
+import { viewMode } from '../composables/useViewMode'
 import router from '../router'
 import AppHeader from './AppHeader.vue'
 import SensorCard from './SensorCard.vue'
 import StatusBanner from './StatusBanner.vue'
 import HistoryChart from './HistoryChart.vue'
 import AlertPanel from './AlertPanel.vue'
+import WateringHistory from './WateringHistory.vue'
+import PlantProfile from './PlantProfile.vue'
 
 const latest = ref(null)
 const status = ref(null)
 const alerts = ref([])
 const moistureHistory = ref([])
 const tempHistory = ref([])
+const wateringEvents = ref([])
+const wateringCfg = ref(null)
 const showConfirm = ref(false)
 const watering = ref(false)
 const error = ref('')
 const success = ref('')
 
 const isOperator = computed(() => authState.value.role === 'operator')
+const isAdvanced = computed(() => viewMode.value === 'advanced')
 
 let pollInterval = null
 
 async function refresh() {
   try {
-    const [l, s, a, mh, th] = await Promise.all([
+    const [l, s, a, mh, th, wh, wc] = await Promise.all([
       api.latest(),
       api.status(),
       api.alertsActive(),
       api.history('moisture'),
       api.history('temperature'),
+      api.wateringHistory(),
+      api.wateringConfig(),
     ])
     latest.value = l
     status.value = s
     alerts.value = a
     moistureHistory.value = mh
     tempHistory.value = th
+    wateringEvents.value = wh
+    wateringCfg.value = wc
   } catch (e) {
     error.value = e.message
     if (e.status === 401) { logout(); router.push('/login') }
+  }
+}
+
+async function saveProfile(payload) {
+  error.value = ''
+  try {
+    await api.updateWateringConfig(payload)
+    success.value = 'Watering profiles updated.'
+    setTimeout(() => { success.value = '' }, 4000)
+    await refresh()
+  } catch (e) {
+    error.value = e.message
   }
 }
 
@@ -115,6 +137,7 @@ function fmtHours(h) {
             unit="%"
             :icon="Droplet"
             tone="emerald"
+            :sub="isAdvanced && latest && latest.soil_moisture.raw_adc != null ? `raw ADC ${latest.soil_moisture.raw_adc}` : ''"
           />
           <SensorCard
             label="Temperature"
@@ -129,6 +152,7 @@ function fmtHours(h) {
             unit="%"
             :icon="Container"
             tone="sky"
+            :sub="isAdvanced && latest && latest.tank.sensor_distance_mm != null ? `dist ${fmt(latest.tank.sensor_distance_mm)} mm` : ''"
           />
         </div>
 
@@ -140,6 +164,7 @@ function fmtHours(h) {
             unit=""
             :icon="Cpu"
             tone="violet"
+            :sub="isAdvanced && latest && latest.controller.reason ? latest.controller.reason : ''"
           />
           <SensorCard
             label="Rain forecast"
@@ -154,6 +179,7 @@ function fmtHours(h) {
             unit="%"
             :icon="BatteryCharging"
             tone="lime"
+            :sub="isAdvanced && latest && latest.power.mode ? `mode ${latest.power.mode}` : ''"
           />
         </div>
 
@@ -183,6 +209,19 @@ function fmtHours(h) {
               Water now
             </Button>
           </div>
+        </div>
+
+        <!-- Plant profiles (operator-editable) + watering history (advanced) -->
+        <div
+          class="grid grid-cols-1 gap-3 sm:gap-4"
+          :class="isAdvanced ? 'lg:grid-cols-2' : ''"
+        >
+          <PlantProfile
+            :config="wateringCfg"
+            :is-operator="isOperator"
+            @save="saveProfile"
+          />
+          <WateringHistory v-if="isAdvanced" :events="wateringEvents" />
         </div>
 
         <!-- Charts -->
