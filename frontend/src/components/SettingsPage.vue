@@ -1,9 +1,14 @@
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import Button from 'primevue/button'
-import { Save } from 'lucide-vue-next'
+import { Save, Bell } from 'lucide-vue-next'
 
 import AppHeader from './AppHeader.vue'
+import {
+  notificationsSupported,
+  notificationPermission,
+  enableNotifications,
+} from '../composables/useNotifications'
 
 const LANDING_KEY = 'plantcps_landing'
 
@@ -15,6 +20,24 @@ function save() {
   saved.value = true
   setTimeout(() => { saved.value = false }, 2000)
 }
+
+// Device-notification capability + status (honest about the known caveats).
+const secure = typeof window !== 'undefined' && window.isSecureContext
+const notifStatus = computed(() => {
+  if (!notificationsSupported) {
+    return { kind: 'unsupported', text: 'Not supported by this browser. On iPhone, add the app to your home screen first.' }
+  }
+  if (!secure) {
+    return { kind: 'insecure', text: 'Needs HTTPS — unavailable over plain http on the local network.' }
+  }
+  if (notificationPermission.value === 'granted') {
+    return { kind: 'granted', text: 'Enabled on this device.' }
+  }
+  if (notificationPermission.value === 'denied') {
+    return { kind: 'denied', text: 'Blocked — allow notifications for this site in your browser settings.' }
+  }
+  return { kind: 'default', text: 'Also get a device notification when the tab is in the background.' }
+})
 </script>
 
 <template>
@@ -89,6 +112,35 @@ function save() {
               Save
             </Button>
             <span v-if="saved" class="text-sm text-plant-400 font-medium">Saved!</span>
+          </div>
+        </div>
+
+        <!-- Alert notifications -->
+        <div class="glass rounded-2xl p-5 sm:p-6 space-y-4">
+          <div class="flex items-center gap-2">
+            <Bell class="w-4 h-4 text-plant-400" />
+            <h3 class="font-semibold text-white">Alert notifications</h3>
+          </div>
+          <p class="text-sm text-white/50">
+            A new anomaly alert always pops up in-app while a tab is open. Enable
+            device notifications to also be alerted when the tab is in the
+            background.
+          </p>
+          <div class="flex items-center gap-3 flex-wrap">
+            <Button
+              v-if="notifStatus.kind === 'default'"
+              @click="enableNotifications"
+              class="!bg-plant-600 !border-plant-600 hover:!bg-plant-500 !rounded-xl"
+            >
+              <Bell class="w-4 h-4 mr-2" />
+              Enable device notifications
+            </Button>
+            <span
+              class="text-sm"
+              :class="notifStatus.kind === 'granted' ? 'text-plant-400' : 'text-white/50'"
+            >
+              {{ notifStatus.text }}
+            </span>
           </div>
         </div>
       </main>

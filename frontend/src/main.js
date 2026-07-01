@@ -23,3 +23,11 @@ app.use(PrimeVue, {
 app.use(VueApexCharts)
 
 app.mount('#app')
+
+// Register the notification service worker (best-effort; enables OS-level
+// notifications on mobile). Silently ignored where unsupported / not secure.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {})
+  })
+}

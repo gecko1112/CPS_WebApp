@@ -244,14 +244,15 @@ class MockSensorService:
                 }
             )
 
-            # Rotate alerts so the panel stays lively during a demo.
-            if self._tick % 25 == 0:
-                if self.active_alerts:
+            # Raise a fresh alert periodically (cycling templates) so the panel
+            # and the toast/notifications stay lively during a demo; cap active.
+            if self._tick % 20 == 0:
+                template = _ALERT_TEMPLATES[(self._tick // 20) % len(_ALERT_TEMPLATES)]
+                alert = {**template, "timestamp": now}
+                self.active_alerts.append(alert)
+                self.recent_alerts.appendleft(alert)
+                if len(self.active_alerts) > 3:
                     self.active_alerts.pop(0)
-                else:
-                    alert = {**random.choice(_ALERT_TEMPLATES), "timestamp": now}
-                    self.active_alerts.append(alert)
-                    self.recent_alerts.appendleft(alert)
 
             self.history["moisture"].append({"t": now, "v": round(cal * 100, 2)})
             self.history["temperature"].append(

@@ -9,6 +9,7 @@ import {
 
 import { api, authState, logout } from '../composables/useApi'
 import { viewMode } from '../composables/useViewMode'
+import { watchAlerts } from '../composables/useAlertWatcher'
 import router from '../router'
 import AppHeader from './AppHeader.vue'
 import SensorCard from './SensorCard.vue'
@@ -50,6 +51,7 @@ async function refresh() {
     latest.value = l
     status.value = s
     alerts.value = a
+    watchAlerts(a)
     moistureHistory.value = mh
     tempHistory.value = th
     wateringEvents.value = wh
