@@ -21,9 +21,24 @@ import random
 from collections import deque
 from datetime import UTC, datetime, timedelta
 
+from .weather_util import weather_condition
+
 
 def _now() -> str:
     return datetime.now(tz=UTC).isoformat()
+
+
+# (precipitation_mm, solar_radiation_wm2) pairs the demo rotates through so the
+# weather icon visibly changes: sunny, partly cloudy, cloudy, light rain, rainy,
+# stormy.
+_WEATHER_SCENARIOS = [
+    (0.0, 820.0),
+    (0.0, 320.0),
+    (0.0, 90.0),
+    (0.6, 160.0),
+    (4.0, 70.0),
+    (12.0, 40.0),
+]
 
 
 # Plant watering profiles (mirrors P05's profiles/*.json: target_moist 0–1,
@@ -73,9 +88,11 @@ class MockSensorService:
         }
         self.controller = {"state": "idle", "reason": None, "timestamp": _now()}
         self.weather = {
-            "rainfall_mm": 2.5,
+            "condition": weather_condition(0.6, 160.0),
             "temperature_c": 22.0,
-            "horizon_label": "+24h",
+            "precipitation_mm": 0.6,
+            "solar_radiation_wm2": 160.0,
+            "horizon_label": "next 24h",
             "confidence": 0.85,
             "status": "live",
             "timestamp": _now(),
@@ -176,11 +193,14 @@ class MockSensorService:
             else:
                 self.controller["timestamp"] = now
 
-            if self._tick % 60 == 0:
+            if self._tick % 30 == 0:
+                precip, solar = random.choice(_WEATHER_SCENARIOS)
                 self.weather.update(
                     {
-                        "rainfall_mm": round(random.uniform(0.0, 8.0), 1),
+                        "condition": weather_condition(precip, solar),
                         "temperature_c": round(18.0 + random.uniform(-3.0, 8.0), 1),
+                        "precipitation_mm": round(precip, 1),
+                        "solar_radiation_wm2": round(solar, 0),
                         "confidence": round(random.uniform(0.6, 0.95), 2),
                         "status": "live",
                         "timestamp": now,

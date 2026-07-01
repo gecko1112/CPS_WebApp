@@ -4,7 +4,7 @@ import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import {
   Droplet, Thermometer, Container,
-  BatteryCharging, CloudRain, Cpu,
+  BatteryCharging, Cpu,
 } from 'lucide-vue-next'
 
 import { api, authState, logout } from '../composables/useApi'
@@ -17,6 +17,7 @@ import HistoryChart from './HistoryChart.vue'
 import AlertPanel from './AlertPanel.vue'
 import WateringHistory from './WateringHistory.vue'
 import PlantProfile from './PlantProfile.vue'
+import WeatherCard from './WeatherCard.vue'
 
 const latest = ref(null)
 const status = ref(null)
@@ -166,13 +167,7 @@ function fmtHours(h) {
             tone="violet"
             :sub="isAdvanced && latest && latest.controller.reason ? latest.controller.reason : ''"
           />
-          <SensorCard
-            label="Rain forecast"
-            :value="latest && latest.weather.status === 'fresh' ? fmt(latest.weather.rainfall_mm) : '—'"
-            unit="mm"
-            :icon="CloudRain"
-            tone="blue"
-          />
+          <WeatherCard :weather="latest ? latest.weather : null" :advanced="isAdvanced" />
           <SensorCard
             label="Battery"
             :value="latest ? fmt(latest.power.battery_soc) : '—'"

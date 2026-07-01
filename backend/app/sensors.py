@@ -30,6 +30,7 @@ import schema.p11 as p11
 import schema.p12 as p12
 
 from .p06_client import P06Client, group_events, latest_values, metric_series
+from .weather_util import weather_condition
 
 log = logging.getLogger("p13.sensors")
 
@@ -69,9 +70,11 @@ class P06SensorService:
         }
         self.controller = {"state": "unknown", "reason": None, "timestamp": None}
         self.weather = {
-            "rainfall_mm": None,
+            "condition": "unknown",
             "temperature_c": None,
-            "horizon_label": "+24h",
+            "precipitation_mm": None,
+            "solar_radiation_wm2": None,
+            "horizon_label": "next 24h",
             "confidence": None,
             "status": "unavailable",
             "timestamp": None,
@@ -232,25 +235,31 @@ class P06SensorService:
         if not v.get("timestamp"):
             return
         temperature_c: float | None = None
-        rainfall_mm: float | None = None
+        precipitation_mm: float | None = None
+        solar_radiation_wm2: float | None = None
         raw_hours = v.get("forecast_hours")
         if isinstance(raw_hours, str):
             try:
                 hours = json.loads(raw_hours)
                 if hours:
-                    temperature_c = _num(hours[0].get("temperature_c"))
-                    rainfall_mm = round(
-                        sum(
-                            float(h.get("precipitation_mm", 0) or 0) for h in hours[:24]
-                        ),
+                    window = hours[:24]
+                    temperature_c = _num(window[0].get("temperature_c"))
+                    precipitation_mm = round(
+                        sum(float(h.get("precipitation_mm", 0) or 0) for h in window),
                         1,
+                    )
+                    solar_radiation_wm2 = max(
+                        (float(h.get("solar_radiation_wm2", 0) or 0) for h in window),
+                        default=None,
                     )
             except (ValueError, TypeError, AttributeError):
                 pass
         self.weather = {
-            "rainfall_mm": rainfall_mm,
+            "condition": weather_condition(precipitation_mm, solar_radiation_wm2),
             "temperature_c": temperature_c,
-            "horizon_label": "+24h",
+            "precipitation_mm": precipitation_mm,
+            "solar_radiation_wm2": solar_radiation_wm2,
+            "horizon_label": "next 24h",
             "confidence": None,
             "status": v.get("status", "unavailable"),
             "timestamp": v.get("timestamp"),
