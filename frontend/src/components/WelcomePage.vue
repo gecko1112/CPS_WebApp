@@ -5,11 +5,12 @@ import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import {
   Droplet, ArrowRight, AlertTriangle,
-  CheckCircle, XCircle, CloudRain, Sprout, BatteryCharging,
+  CheckCircle, XCircle, CloudRain, Sprout,
   LayoutDashboard,
 } from 'lucide-vue-next'
 
-import { api, authState } from '../composables/useApi'
+import { api, authState, logout } from '../composables/useApi'
+import router from '../router'
 import AppHeader from './AppHeader.vue'
 
 const status = ref(null)
@@ -34,7 +35,11 @@ async function refresh() {
     status.value = s
     latest.value = l
     alerts.value = a
-  } catch { /* ignore — next tick will retry */ }
+  } catch (e) {
+    // Stale/expired token → bounce to login instead of polling 401 forever.
+    if (e.status === 401) { logout(); router.push('/login') }
+    // other errors: ignore, the next tick retries
+  }
 }
 
 async function confirmWater() {
