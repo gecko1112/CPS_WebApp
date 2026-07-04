@@ -19,6 +19,7 @@ import AlertPanel from './AlertPanel.vue'
 import WateringHistory from './WateringHistory.vue'
 import PlantProfile from './PlantProfile.vue'
 import WeatherCard from './WeatherCard.vue'
+import ComponentHealth from './ComponentHealth.vue'
 
 const latest = ref(null)
 const status = ref(null)
@@ -27,6 +28,7 @@ const moistureHistory = ref([])
 const tempHistory = ref([])
 const wateringEvents = ref([])
 const wateringCfg = ref(null)
+const components = ref([])
 const showConfirm = ref(false)
 const watering = ref(false)
 const error = ref('')
@@ -39,7 +41,7 @@ let pollInterval = null
 
 async function refresh() {
   try {
-    const [l, s, a, mh, th, wh, wc] = await Promise.all([
+    const [l, s, a, mh, th, wh, wc, co] = await Promise.all([
       api.latest(),
       api.status(),
       api.alertsActive(),
@@ -47,6 +49,7 @@ async function refresh() {
       api.history('temperature'),
       api.wateringHistory(),
       api.wateringConfig(),
+      api.components(),
     ])
     latest.value = l
     status.value = s
@@ -56,6 +59,7 @@ async function refresh() {
     tempHistory.value = th
     wateringEvents.value = wh
     wateringCfg.value = wc
+    components.value = co
   } catch (e) {
     error.value = e.message
     if (e.status === 401) { logout(); router.push('/login') }
@@ -207,6 +211,9 @@ function fmtHours(h) {
             </Button>
           </div>
         </div>
+
+        <!-- Component status (advanced) -->
+        <ComponentHealth v-if="isAdvanced" :components="components" />
 
         <!-- Plant profiles (operator-editable) + watering history (advanced) -->
         <div

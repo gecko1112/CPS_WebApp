@@ -21,6 +21,7 @@ import random
 from collections import deque
 from datetime import UTC, datetime, timedelta
 
+from .components import COMPONENTS
 from .weather_util import weather_condition
 
 
@@ -132,6 +133,7 @@ class MockSensorService:
         self.last_watered_at: datetime | None = None
         self._task: asyncio.Task | None = None
         self._tick = 0
+        self._offline_component: str | None = None  # one component "drops" now and then
 
         # Plant profile (owned by P05; we only display + forward edits). In demo
         # mode we keep an editable in-memory copy so the UI is fully functional.
@@ -254,6 +256,15 @@ class MockSensorService:
                 if len(self.active_alerts) > 3:
                     self.active_alerts.pop(0)
 
+            # Occasionally drop one component offline (then restore it) so the
+            # component-health strip visibly changes during a demo.
+            if self._tick % 45 == 0:
+                self._offline_component = (
+                    None
+                    if self._offline_component
+                    else random.choice(["p07", "p08", "p11", "p12"])
+                )
+
             self.history["moisture"].append({"t": now, "v": round(cal * 100, 2)})
             self.history["temperature"].append(
                 {"t": now, "v": round(self.weather["temperature_c"], 2)}
@@ -293,6 +304,18 @@ class MockSensorService:
         return {"topic": "mock://p05/manual_trigger", "seq": self._tick}
 
     # -- watering history + plant profile -----------------------------------
+
+    def get_component_health(self) -> list[dict]:
+        now = _now()
+        return [
+            {
+                "id": cid,
+                "label": label,
+                "online": cid != self._offline_component,
+                "last_seen": None if cid == self._offline_component else now,
+            }
+            for cid, label in COMPONENTS
+        ]
 
     def get_watering_history(self, limit: int = 20) -> list[dict]:
         return list(self.watering_events)[:limit]

@@ -29,6 +29,7 @@ import schema.p08 as p08
 import schema.p11 as p11
 import schema.p12 as p12
 
+from .components import COMPONENTS, is_fresh
 from .p06_client import P06Client, group_events, latest_values, metric_series
 from .weather_util import weather_condition
 
@@ -36,6 +37,7 @@ log = logging.getLogger("p13.sensors")
 
 POLL_INTERVAL_S = float(os.getenv("POLL_INTERVAL_S", "10"))
 ACTIVE_ALERT_WINDOW_MIN = float(os.getenv("ACTIVE_ALERT_WINDOW_MIN", "10"))
+COMPONENT_FRESH_WINDOW_S = float(os.getenv("COMPONENT_FRESH_WINDOW_S", "90"))
 
 # Sensors exposed by /api/sensors/history -> (topic, measurement, value scale).
 # Soil is scaled 0–1 -> 0–100 % to match the previous chart units.
@@ -336,6 +338,33 @@ class P06SensorService:
             ),
             "active_alert_count": n_alerts,
         }
+
+    def get_component_health(self) -> list[dict]:
+        # Derive liveness from the freshness of each component's latest reading.
+        # P06 is judged by our own connection; P08 is event-driven so it's only
+        # inferable from a recent alert (else "unknown" -> online=None).
+        latest_ts = {
+            "p01": self.soil_moisture.get("timestamp"),
+            "p05": self.controller.get("timestamp"),
+            "p07": self.weather.get("timestamp"),
+            "p11": self.tank.get("timestamp"),
+            "p12": self.power.get("timestamp"),
+        }
+        p08_ts = self.recent_alerts[0].get("timestamp") if self.recent_alerts else None
+
+        out: list[dict] = []
+        for cid, label in COMPONENTS:
+            if cid == "p06":
+                online: bool | None = self._connected
+                last = None
+            elif cid == "p08":
+                last = p08_ts
+                online = is_fresh(p08_ts, COMPONENT_FRESH_WINDOW_S) if p08_ts else None
+            else:
+                last = latest_ts.get(cid)
+                online = is_fresh(last, COMPONENT_FRESH_WINDOW_S)
+            out.append({"id": cid, "label": label, "online": online, "last_seen": last})
+        return out
 
     # -- watering history + plant profile (real mode: honest stubs) ---------
 

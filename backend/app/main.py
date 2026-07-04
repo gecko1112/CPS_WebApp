@@ -112,6 +112,11 @@ async def system_status(_: User = Depends(current_active_user)):
     return sensor_service.system_status()
 
 
+@app.get("/api/system/components")
+async def system_components(_: User = Depends(current_active_user)):
+    return sensor_service.get_component_health()
+
+
 # ---------------------------------------------------------------------------
 # Alerts — matches P08 AnomalyAlert shape
 # ---------------------------------------------------------------------------
