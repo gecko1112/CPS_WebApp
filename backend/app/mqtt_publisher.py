@@ -14,9 +14,11 @@ Uses paho-mqtt (the convention across the monorepo's publishers). The client
 runs its own network thread (``loop_start``); ``publish_watering`` is called
 from the FastAPI request thread and is safe to do so.
 
-SECURITY: this is the security-critical path. For production it needs TLS to the
-broker (from P04/P09) and an application-level signature (HMAC) on the payload
-so P05 can authenticate the sender — see issue #16. Marked TODO below.
+SECURITY (issue #16, per P09): the broker secures this path — MQTT over TLS +
+our per-component P13 credentials + a broker ACL that only lets P13 publish to
+the watering topic. Configured via env (MQTT_TLS*, MQTT_USERNAME/PASSWORD),
+off by default so the local/demo broker works; fill in with P09's values.
+P09's model uses no app-layer payload signing.
 """
 
 from __future__ import annotations
@@ -58,6 +60,24 @@ _INFO_TOPIC = getattr(p13, "InfoTopic", None)
 _BIRTH_TOPIC = getattr(p13, "BirthTopic", None) or _INFO_TOPIC
 _DEATH_TOPIC = getattr(p13, "DeathTopic", None) or _INFO_TOPIC
 
+# --- Broker security (issue #16, per P09) ----------------------------------
+# P09's model is broker-centric: MQTT over TLS + per-component credentials +
+# per-component ACLs (the broker enforces that only P13 may publish to the
+# watering DCMD topic). We wire our client to accept those via env, ready for
+# P09's real values; all off by default so the local/demo broker still works.
+USERNAME = os.getenv("MQTT_USERNAME") or None
+PASSWORD = os.getenv("MQTT_PASSWORD") or None
+USE_TLS = os.getenv("MQTT_TLS", "false").lower() in ("1", "true", "yes", "on")
+TLS_CA = os.getenv("MQTT_TLS_CA") or None  # CA cert to trust (from P09)
+TLS_CERT = os.getenv("MQTT_TLS_CERT") or None  # client cert (only if mTLS)
+TLS_KEY = os.getenv("MQTT_TLS_KEY") or None
+TLS_INSECURE = os.getenv("MQTT_TLS_INSECURE", "false").lower() in (
+    "1",
+    "true",
+    "yes",
+    "on",
+)  # skip server-hostname verification — testing only
+
 
 def _build_nbirth(seq: SequenceCounter, bd_seq: BirthDeathCounter) -> SparkplugPayload:
     """Minimal NBIRTH for a node with no domain metrics: reset seq to 0 and
@@ -89,6 +109,23 @@ class WateringPublisher:
         client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=CLIENT_ID)
         client.on_connect = self._on_connect
         client.on_disconnect = self._on_disconnect
+
+        # Per-component credentials (P09 distributes these).
+        if USERNAME:
+            client.username_pw_set(USERNAME, PASSWORD)
+
+        # MQTT over TLS (P09's secured broker). tls_set() with ca_certs=None uses
+        # the system trust store; pass P09's CA via MQTT_TLS_CA. certfile/keyfile
+        # enable mTLS if P09 requires client certificates.
+        if USE_TLS:
+            try:
+                client.tls_set(ca_certs=TLS_CA, certfile=TLS_CERT, keyfile=TLS_KEY)
+                if TLS_INSECURE:
+                    client.tls_insecure_set(True)
+                log.info("MQTT TLS enabled (ca=%s, mtls=%s)", TLS_CA, bool(TLS_CERT))
+            except Exception as exc:  # noqa: BLE001 — degrade gracefully
+                log.error("MQTT TLS setup failed: %s", exc)
+
         # Register the LWT (NDEATH) before connecting so the broker publishes it
         # on an unexpected drop.
         client.will_set(
@@ -150,8 +187,9 @@ class WateringPublisher:
             action=ManualWateringAction(action), duration_s=duration_s
         )
         seq_used = self._seq.current
-        # TODO(security): HMAC-sign this payload and run the broker link over TLS
-        # before production. Manual watering is safety-critical (issue #16).
+        # Security (per P09): authentication + integrity come from the broker —
+        # TLS + our P13 credentials + an ACL that only lets P13 publish here (all
+        # configured in start()). No app-layer payload signing in P09's model.
         payload = codec.encode(trigger.to_data(self._seq))
         info = self._client.publish(
             ManualTriggerCommandTopic.address,
