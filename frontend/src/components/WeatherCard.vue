@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import {
   Sun, CloudSun, Cloud, CloudDrizzle, CloudRain, CloudLightning, CloudOff,
 } from 'lucide-vue-next'
+import HintBubble from './HintBubble.vue'
 
 const props = defineProps({
   weather: { type: Object, default: null },
@@ -29,7 +30,11 @@ const hasData = computed(
 </script>
 
 <template>
-  <div class="glass rounded-2xl p-4 sm:p-5 flex items-center gap-4">
+  <div class="glass rounded-2xl p-4 sm:p-5 flex items-center gap-4 group relative">
+    <HintBubble
+      title="Weather forecast"
+      text="Expected conditions for the next 24 h, from the weather service (P07). Used to hold off watering when rain is coming."
+    />
     <component :is="cond.icon" :class="[cond.color, 'w-10 h-10 shrink-0']" />
     <div class="min-w-0">
       <p class="text-xs sm:text-sm text-white/50 truncate">

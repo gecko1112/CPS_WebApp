@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue'
+import HintBubble from './HintBubble.vue'
 
 const props = defineProps({
   title: String,
@@ -7,6 +8,8 @@ const props = defineProps({
   color: { type: String, default: '#34d399' },
   unit: { type: String, default: '' },
   dark: { type: Boolean, default: false },
+  hint: { type: String, default: '' },
+  range: { type: String, default: '' },
 })
 
 const chartOptions = computed(() => ({
@@ -61,7 +64,8 @@ const chartSeries = computed(() => [
 </script>
 
 <template>
-  <div :class="[dark ? 'glass' : 'bg-white shadow-sm', 'rounded-2xl p-4 sm:p-5']">
+  <div :class="[dark ? 'glass' : 'bg-white shadow-sm', 'rounded-2xl p-4 sm:p-5 group relative']">
+    <HintBubble v-if="hint" :title="title" :text="hint" :range="range" />
     <h3 :class="['text-sm font-semibold mb-2', dark ? 'text-white/60' : 'text-slate-700']">
       {{ title }}
     </h3>

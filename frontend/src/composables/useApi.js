@@ -93,8 +93,10 @@ export function logout() {
 
 export const api = {
   latest: () => request('/api/sensors/latest'),
-  history: (sensor, maxPoints = 200) =>
-    request(`/api/sensors/history?sensor=${sensor}&max_points=${maxPoints}`),
+  history: (sensor, maxPoints = 200, hours = 24) =>
+    request(
+      `/api/sensors/history?sensor=${sensor}&max_points=${maxPoints}&hours=${hours}`,
+    ),
   status: () => request('/api/system/status'),
   components: () => request('/api/system/components'),
   alertsActive: () => request('/api/alerts/active'),

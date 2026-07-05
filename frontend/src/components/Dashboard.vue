@@ -20,6 +20,7 @@ import WateringHistory from './WateringHistory.vue'
 import PlantProfile from './PlantProfile.vue'
 import WeatherCard from './WeatherCard.vue'
 import ComponentHealth from './ComponentHealth.vue'
+import PlantHealth from './PlantHealth.vue'
 
 const latest = ref(null)
 const status = ref(null)
@@ -29,6 +30,7 @@ const tempHistory = ref([])
 const wateringEvents = ref([])
 const wateringCfg = ref(null)
 const components = ref([])
+const historyRange = ref(24) // hours: 1 | 12 | 24
 const showConfirm = ref(false)
 const watering = ref(false)
 const error = ref('')
@@ -45,8 +47,8 @@ async function refresh() {
       api.latest(),
       api.status(),
       api.alertsActive(),
-      api.history('moisture'),
-      api.history('temperature'),
+      api.history('moisture', 200, historyRange.value),
+      api.history('temperature', 200, historyRange.value),
       api.wateringHistory(),
       api.wateringConfig(),
       api.components(),
@@ -64,6 +66,11 @@ async function refresh() {
     error.value = e.message
     if (e.status === 401) { logout(); router.push('/login') }
   }
+}
+
+function setRange(h) {
+  historyRange.value = h
+  refresh()
 }
 
 async function saveProfile(payload) {
@@ -130,6 +137,9 @@ function fmtHours(h) {
       <AppHeader transparent />
 
       <main class="max-w-5xl mx-auto p-4 space-y-4">
+        <!-- Plant health headline (most important for the everyday user) -->
+        <PlantHealth :health="status?.plant_health" />
+
         <!-- Status banner -->
         <StatusBanner :status="status" />
 
@@ -145,6 +155,8 @@ function fmtHours(h) {
             :icon="Droplet"
             tone="emerald"
             :sub="isAdvanced && latest && latest.soil_moisture.raw_adc != null ? `raw ADC ${latest.soil_moisture.raw_adc}` : ''"
+            hint="How wet the soil is right now, from the calibrated moisture sensor. 0% is bone dry, 100% is fully saturated."
+            range="40–70% for most plants"
           />
           <SensorCard
             label="Temperature"
@@ -152,6 +164,8 @@ function fmtHours(h) {
             unit="°C"
             :icon="Thermometer"
             tone="amber"
+            hint="Air temperature near the plant, from the weather service."
+            range="18–26 °C for most houseplants"
           />
           <SensorCard
             label="Water tank"
@@ -160,6 +174,8 @@ function fmtHours(h) {
             :icon="Container"
             tone="sky"
             :sub="isAdvanced && latest && latest.tank.sensor_distance_mm != null ? `dist ${fmt(latest.tank.sensor_distance_mm)} mm` : ''"
+            hint="How full the water reservoir is. When it runs low, refill it or watering will be suppressed."
+            range="keep above 25%"
           />
         </div>
 
@@ -172,6 +188,7 @@ function fmtHours(h) {
             :icon="Cpu"
             tone="violet"
             :sub="isAdvanced && latest && latest.controller.reason ? latest.controller.reason : ''"
+            hint="What the watering controller is doing: idle, watering, soaking, suppressed (e.g. rain expected), or error."
           />
           <WeatherCard :weather="latest ? latest.weather : null" :advanced="isAdvanced" />
           <SensorCard
@@ -181,6 +198,8 @@ function fmtHours(h) {
             :icon="BatteryCharging"
             tone="lime"
             :sub="isAdvanced && latest && latest.power.mode ? `mode ${latest.power.mode}` : ''"
+            hint="Charge of the solar battery that powers the sensors and pump. Low battery reduces non-essential activity."
+            range="above 20%"
           />
         </div>
 
@@ -228,22 +247,51 @@ function fmtHours(h) {
           <WateringHistory v-if="isAdvanced" :events="wateringEvents" />
         </div>
 
-        <!-- Charts -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Charts + time-range selector -->
+        <div class="space-y-3">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-semibold text-white/60">History</h3>
+            <div class="flex items-center rounded-lg bg-white/10 p-0.5 text-xs font-medium">
+              <button
+                v-for="opt in [
+                  { h: 1, l: 'Last hour' },
+                  { h: 12, l: 'Last 12h' },
+                  { h: 24, l: 'Last 24h' },
+                ]"
+                :key="opt.h"
+                type="button"
+                @click="setRange(opt.h)"
+                :class="[
+                  'px-2.5 py-1 rounded-md transition-colors',
+                  historyRange === opt.h
+                    ? 'bg-white/20 text-white'
+                    : 'text-white/50 hover:text-white',
+                ]"
+              >
+                {{ opt.l }}
+              </button>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <HistoryChart
-            title="Soil moisture (live)"
+            title="Soil moisture"
             :series="moistureHistory"
             color="#34d399"
             unit="%"
             dark
+            hint="Soil moisture trend over the selected window. Watch for it dropping toward the dry threshold before a watering."
+            range="40–70%"
           />
           <HistoryChart
-            title="Temperature (live)"
+            title="Temperature"
             :series="tempHistory"
             color="#fbbf24"
             unit="°C"
             dark
+            hint="Air temperature trend over the selected window."
+            range="18–26 °C"
           />
+          </div>
         </div>
 
         <p v-if="error" class="text-sm text-rose-400">{{ error }}</p>

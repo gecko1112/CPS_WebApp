@@ -80,7 +80,7 @@ _ALERT_TEMPLATES = [
 
 
 class MockSensorService:
-    def __init__(self, history_size: int = 2880) -> None:
+    def __init__(self, history_size: int = 20000) -> None:
         self.soil_moisture = {
             "calibrated": 0.45,
             "raw_adc": 1847,
@@ -130,6 +130,7 @@ class MockSensorService:
             "temperature": deque(maxlen=history_size),
             "tank_level": deque(maxlen=history_size),
         }
+        self._seed_history()
         self.last_watered_at: datetime | None = None
         self._task: asyncio.Task | None = None
         self._tick = 0
@@ -157,6 +158,21 @@ class MockSensorService:
             ],
             maxlen=50,
         )
+
+    def _seed_history(self) -> None:
+        """Backfill ~24 h of history (5-min steps) so the time-range selector
+        (1h / 12h / 24h) has data from the very start of a demo."""
+        now = datetime.now(tz=UTC)
+        for i in range(288, 0, -1):  # 288 * 5 min = 24 h
+            t = (now - timedelta(minutes=5 * i)).isoformat()
+            moist = 45 + 12 * math.sin(i / 22) + random.uniform(-3, 3)
+            temp = 22 + 4 * math.sin(i / 34) + random.uniform(-1, 1)
+            tank = 80 - (288 - i) * 0.02
+            self.history["moisture"].append(
+                {"t": t, "v": round(max(5, min(95, moist)), 2)}
+            )
+            self.history["temperature"].append({"t": t, "v": round(temp, 2)})
+            self.history["tank_level"].append({"t": t, "v": round(max(0, tank), 2)})
 
     # -- lifecycle ----------------------------------------------------------
 
@@ -352,10 +368,13 @@ class MockSensorService:
             "power": {**self.power},
         }
 
-    async def get_history(self, sensor: str, max_points: int = 200) -> list[dict]:
+    async def get_history(
+        self, sensor: str, max_points: int = 200, hours: int = 24
+    ) -> list[dict]:
         if sensor not in self.history:
             return []
-        full = list(self.history[sensor])
+        cutoff = (datetime.now(tz=UTC) - timedelta(hours=hours)).isoformat()
+        full = [p for p in self.history[sensor] if p["t"] >= cutoff]
         if len(full) <= max_points:
             return full
         step = len(full) / max_points
@@ -391,6 +410,9 @@ class MockSensorService:
                 self.last_watered_at.isoformat() if self.last_watered_at else None
             ),
             "active_alert_count": n_alerts,
+            # Plant health headline. Placeholder until P16 (Plant Health Model)
+            # ships a real score; for now derived from the overall status level.
+            "plant_health": "needs_attention" if level == "error" else "healthy",
             "demo_mode": True,
         }
 

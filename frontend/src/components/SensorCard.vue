@@ -1,4 +1,6 @@
 <script setup>
+import HintBubble from './HintBubble.vue'
+
 defineProps({
   label: String,
   value: [Number, String],
@@ -6,6 +8,8 @@ defineProps({
   icon: Object,
   tone: { type: String, default: 'slate' },
   sub: { type: String, default: '' }, // raw/detail line shown in advanced view
+  hint: { type: String, default: '' }, // explainer shown on hover
+  range: { type: String, default: '' }, // normal range shown in the hint
 })
 
 const toneClasses = {
@@ -21,7 +25,8 @@ const toneClasses = {
 </script>
 
 <template>
-  <div class="glass rounded-2xl p-4 sm:p-5 flex items-center gap-4">
+  <div class="glass rounded-2xl p-4 sm:p-5 flex items-center gap-4 group relative">
+    <HintBubble v-if="hint" :title="label" :text="hint" :range="range" />
     <div :class="[toneClasses[tone]?.split(' ')[0] || 'bg-white/10', 'p-3 rounded-xl shrink-0']">
       <component :is="icon" :class="[toneClasses[tone]?.split(' ')[1] || 'text-white/60', 'w-6 h-6']" />
     </div>

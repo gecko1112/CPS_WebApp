@@ -290,12 +290,15 @@ class P06SensorService:
             "power": {**self.power},
         }
 
-    async def get_history(self, sensor: str, max_points: int = 200) -> list[dict]:
+    async def get_history(
+        self, sensor: str, max_points: int = 200, hours: int = 24
+    ) -> list[dict]:
         source = _HISTORY_SOURCES.get(sensor)
         if source is None or self._client is None:
             return []
         topic, measurement, scale = source
-        rows = await self._client.history(topic, hours=24, downsample="5m")
+        downsample = "1m" if hours <= 1 else "5m"
+        rows = await self._client.history(topic, hours=hours, downsample=downsample)
         pts = metric_series(rows, measurement, scale=scale)
         if len(pts) > max_points:
             step = len(pts) / max_points
@@ -337,6 +340,9 @@ class P06SensorService:
                 self.last_watered_at.isoformat() if self.last_watered_at else None
             ),
             "active_alert_count": n_alerts,
+            # Plant health headline. Placeholder until P16 (Plant Health Model)
+            # ships a real score; for now derived from the overall status level.
+            "plant_health": "needs_attention" if level == "error" else "healthy",
         }
 
     def get_component_health(self) -> list[dict]:

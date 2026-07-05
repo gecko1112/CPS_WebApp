@@ -100,11 +100,12 @@ async def latest(_: User = Depends(current_active_user)):
 async def history(
     sensor: str,
     max_points: int = 200,
+    hours: int = Query(default=24, ge=1, le=168),
     _: User = Depends(current_active_user),
 ):
     if sensor not in ("moisture", "temperature", "tank_level"):
         raise HTTPException(status_code=400, detail="Unknown sensor")
-    return await sensor_service.get_history(sensor, max_points=max_points)
+    return await sensor_service.get_history(sensor, max_points=max_points, hours=hours)
 
 
 @app.get("/api/system/status")
