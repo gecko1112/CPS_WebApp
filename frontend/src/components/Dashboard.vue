@@ -154,7 +154,7 @@ function fmtHours(h) {
           :controller="latest.controller"
         />
 
-        <!-- Primary sensor cards -->
+        <!-- Key stats (both views) -->
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
           <SensorCard
             label="Soil moisture"
@@ -167,15 +167,6 @@ function fmtHours(h) {
             range="40–70% for most plants"
           />
           <SensorCard
-            label="Temperature"
-            :value="latest ? fmt(latest.weather.temperature_c) : '—'"
-            unit="°C"
-            :icon="Thermometer"
-            tone="amber"
-            hint="Air temperature near the plant, from the weather service."
-            range="18–26 °C for most houseplants"
-          />
-          <SensorCard
             label="Water tank"
             :value="latest ? fmt(latest.tank.level_pct) : '—'"
             unit="%"
@@ -185,42 +176,54 @@ function fmtHours(h) {
             hint="How full the water reservoir is. When it runs low, refill it or watering will be suppressed."
             range="keep above 25%"
           />
+          <WeatherCard :weather="latest ? latest.weather : null" :advanced="isAdvanced" />
         </div>
 
-        <!-- Secondary info cards -->
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+        <!-- Expert stats (advanced view only) -->
+        <div v-if="isAdvanced" class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+          <SensorCard
+            label="Temperature"
+            :value="latest ? fmt(latest.weather.temperature_c) : '—'"
+            unit="°C"
+            :icon="Thermometer"
+            tone="amber"
+            hint="Air temperature near the plant, from the weather service."
+            range="18–26 °C for most houseplants"
+          />
           <SensorCard
             label="Controller"
             :value="latest ? latest.controller.state : '—'"
             unit=""
             :icon="Cpu"
             tone="violet"
-            :sub="isAdvanced && latest && latest.controller.reason ? latest.controller.reason : ''"
+            :sub="latest && latest.controller.reason ? latest.controller.reason : ''"
             hint="What the watering controller is doing: idle, watering, soaking, suppressed (e.g. rain expected), or error."
           />
-          <WeatherCard :weather="latest ? latest.weather : null" :advanced="isAdvanced" />
           <SensorCard
             label="Battery"
             :value="latest ? fmt(latest.power.battery_soc) : '—'"
             unit="%"
             :icon="BatteryCharging"
             tone="lime"
-            :sub="isAdvanced && latest && latest.power.mode ? `mode ${latest.power.mode}` : ''"
+            :sub="latest && latest.power.mode ? `mode ${latest.power.mode}` : ''"
             hint="Charge of the solar battery that powers the sensors and pump. Low battery reduces non-essential activity."
             range="above 20%"
           />
         </div>
 
-        <!-- Tank time-to-empty + manual watering -->
+        <!-- Manual watering (+ tank time-to-empty in expert view) -->
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-          <div class="glass rounded-2xl p-4 sm:p-5">
+          <div v-if="isAdvanced" class="glass rounded-2xl p-4 sm:p-5">
             <p class="text-sm text-white/50 mb-1">Tank time to empty</p>
             <p class="text-2xl font-bold text-white">
               {{ latest ? fmtHours(latest.tank_forecast.time_to_empty_h) : '—' }}
             </p>
           </div>
 
-          <div class="glass rounded-2xl p-4 sm:p-5 flex items-center justify-between gap-3">
+          <div
+            class="glass rounded-2xl p-4 sm:p-5 flex items-center justify-between gap-3"
+            :class="!isAdvanced ? 'sm:col-span-2' : ''"
+          >
             <div>
               <p class="font-semibold text-white">Manual watering</p>
               <p class="text-sm text-white/50">
@@ -280,7 +283,7 @@ function fmtHours(h) {
               </button>
             </div>
           </div>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="grid grid-cols-1 gap-4" :class="isAdvanced ? 'md:grid-cols-2' : ''">
           <HistoryChart
             title="Soil moisture"
             :series="moistureHistory"
@@ -291,6 +294,7 @@ function fmtHours(h) {
             range="40–70%"
           />
           <HistoryChart
+            v-if="isAdvanced"
             title="Temperature"
             :series="tempHistory"
             color="#fbbf24"
