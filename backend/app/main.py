@@ -7,6 +7,7 @@ Docs at:   http://localhost:8000/docs
 
 from __future__ import annotations
 
+import asyncio
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -24,6 +25,7 @@ from .auth import (
     init_db,
     require_operator,
 )
+from .email_util import EMAIL_ENABLED, send_email
 from .models import User
 from .schemas import UserCreate, UserRead, UserUpdate
 
@@ -119,6 +121,30 @@ async def system_components(_: User = Depends(current_active_user)):
 
 
 # ---------------------------------------------------------------------------
+# Email notifications (stretch goal). Operator sends a test mail to the mock
+# SMTP server (Mailpit) to demo the feature.
+# ---------------------------------------------------------------------------
+@app.post("/api/notify/test")
+async def notify_test(user: User = Depends(require_operator)):
+    if not EMAIL_ENABLED:
+        raise HTTPException(
+            status_code=503,
+            detail="Email is disabled. Set EMAIL_ENABLED=true and run Mailpit (:1025).",
+        )
+    ok = await send_email(
+        "🌱 Plant CPS — test notification",
+        f"This is a test alert notification from the Plant CPS dashboard.\n"
+        f"Requested by {user.email}.",
+    )
+    if not ok:
+        raise HTTPException(
+            status_code=502,
+            detail="Could not send the email — is Mailpit running on :1025?",
+        )
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
 # Alerts — matches P08 AnomalyAlert shape
 # ---------------------------------------------------------------------------
 @app.get("/api/alerts/active")
@@ -168,6 +194,16 @@ async def trigger_water(req: WaterRequest, user: User = Depends(require_operator
                 status_code=503,
                 detail=f"Watering command could not be sent: {exc}",
             ) from exc
+    # Stretch: best-effort email notification (fire-and-forget; only sends when
+    # EMAIL_ENABLED). Never blocks or fails the command.
+    asyncio.create_task(
+        send_email(
+            "🌱 Plant CPS — watering triggered",
+            f"A manual watering command ({req.action}"
+            + (f", {duration} s" if duration else "")
+            + f") was issued by {user.email}.",
+        )
+    )
     return {
         "ok": True,
         "triggered_by": user.email,

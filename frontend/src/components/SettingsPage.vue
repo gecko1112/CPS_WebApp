@@ -1,14 +1,34 @@
 <script setup>
 import { computed, ref } from 'vue'
 import Button from 'primevue/button'
-import { Save, Bell } from 'lucide-vue-next'
+import { Save, Bell, Mail } from 'lucide-vue-next'
 
 import AppHeader from './AppHeader.vue'
+import { api } from '../composables/useApi'
 import {
   notificationsSupported,
   notificationPermission,
   enableNotifications,
 } from '../composables/useNotifications'
+
+// Email stretch-goal demo (Mailpit mock SMTP).
+const emailMsg = ref('')
+const emailErr = ref('')
+const emailSending = ref(false)
+
+async function sendTestEmail() {
+  emailMsg.value = ''
+  emailErr.value = ''
+  emailSending.value = true
+  try {
+    await api.notifyTest()
+    emailMsg.value = 'Test email sent — check Mailpit at localhost:8025.'
+  } catch (e) {
+    emailErr.value = e.message
+  } finally {
+    emailSending.value = false
+  }
+}
 
 const LANDING_KEY = 'plantcps_landing'
 
@@ -141,6 +161,34 @@ const notifStatus = computed(() => {
             >
               {{ notifStatus.text }}
             </span>
+          </div>
+        </div>
+
+        <!-- Email notifications (stretch goal — demo via Mailpit mock SMTP) -->
+        <div class="glass rounded-2xl p-5 sm:p-6 space-y-4">
+          <div class="flex items-center gap-2">
+            <Mail class="w-4 h-4 text-plant-400" />
+            <h3 class="font-semibold text-white">
+              Email notifications
+              <span class="text-xs font-normal text-white/40">· stretch goal</span>
+            </h3>
+          </div>
+          <p class="text-sm text-white/50">
+            Demonstrates email alerts through a mock SMTP server (Mailpit). Needs
+            <code class="text-white/60">EMAIL_ENABLED=true</code> and Mailpit running;
+            sent mail shows up at <span class="text-white/60">localhost:8025</span>.
+          </p>
+          <div class="flex items-center gap-3 flex-wrap">
+            <Button
+              @click="sendTestEmail"
+              :loading="emailSending"
+              class="!bg-plant-600 !border-plant-600 hover:!bg-plant-500 !rounded-xl"
+            >
+              <Mail class="w-4 h-4 mr-2" />
+              Send test email
+            </Button>
+            <span v-if="emailMsg" class="text-sm text-plant-400">{{ emailMsg }}</span>
+            <span v-if="emailErr" class="text-sm text-rose-400">{{ emailErr }}</span>
           </div>
         </div>
       </main>

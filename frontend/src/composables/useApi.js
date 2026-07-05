@@ -108,6 +108,7 @@ export const api = {
     }),
   wateringHistory: (limit = 20) =>
     request(`/api/watering/history?limit=${limit}`),
+  notifyTest: () => request('/api/notify/test', { method: 'POST' }),
   wateringConfig: () => request('/api/config/watering'),
   updateWateringConfig: (payload) =>
     request('/api/config/watering', {
