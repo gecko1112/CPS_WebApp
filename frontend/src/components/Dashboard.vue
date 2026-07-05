@@ -21,6 +21,7 @@ import PlantProfile from './PlantProfile.vue'
 import WeatherCard from './WeatherCard.vue'
 import ComponentHealth from './ComponentHealth.vue'
 import PlantHealth from './PlantHealth.vue'
+import SystemDepiction from './SystemDepiction.vue'
 
 const latest = ref(null)
 const status = ref(null)
@@ -145,6 +146,13 @@ function fmtHours(h) {
 
         <!-- Alerts panel -->
         <AlertPanel :alerts="alerts" />
+
+        <!-- Whole-system depiction: tank level + pump activity + plant -->
+        <SystemDepiction
+          v-if="latest"
+          :tank="latest.tank"
+          :controller="latest.controller"
+        />
 
         <!-- Primary sensor cards -->
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
