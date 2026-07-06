@@ -155,7 +155,7 @@ function fmtHours(h) {
         />
 
         <!-- Key stats (both views) -->
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <SensorCard
             label="Soil moisture"
             :value="latest ? pct(latest.soil_moisture.calibrated) : '—'"
@@ -165,6 +165,15 @@ function fmtHours(h) {
             :sub="isAdvanced && latest && latest.soil_moisture.raw_adc != null ? `raw ADC ${latest.soil_moisture.raw_adc}` : ''"
             hint="How wet the soil is right now, from the calibrated moisture sensor. 0% is bone dry, 100% is fully saturated."
             range="40–70% for most plants"
+          />
+          <SensorCard
+            label="Temperature"
+            :value="latest ? fmt(latest.weather.temperature_c) : '—'"
+            unit="°C"
+            :icon="Thermometer"
+            tone="amber"
+            hint="Air temperature near the plant, from the weather service."
+            range="18–26 °C for most houseplants"
           />
           <SensorCard
             label="Water tank"
@@ -180,16 +189,7 @@ function fmtHours(h) {
         </div>
 
         <!-- Expert stats (advanced view only) -->
-        <div v-if="isAdvanced" class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-          <SensorCard
-            label="Temperature"
-            :value="latest ? fmt(latest.weather.temperature_c) : '—'"
-            unit="°C"
-            :icon="Thermometer"
-            tone="amber"
-            hint="Air temperature near the plant, from the weather service."
-            range="18–26 °C for most houseplants"
-          />
+        <div v-if="isAdvanced" class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           <SensorCard
             label="Controller"
             :value="latest ? latest.controller.state : '—'"
@@ -253,6 +253,7 @@ function fmtHours(h) {
           <PlantProfile
             :config="wateringCfg"
             :is-operator="isOperator"
+            :advanced="isAdvanced"
             @save="saveProfile"
           />
           <WateringHistory v-if="isAdvanced" :events="wateringEvents" />
@@ -283,7 +284,7 @@ function fmtHours(h) {
               </button>
             </div>
           </div>
-          <div class="grid grid-cols-1 gap-4" :class="isAdvanced ? 'md:grid-cols-2' : ''">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <HistoryChart
             title="Soil moisture"
             :series="moistureHistory"
@@ -294,7 +295,6 @@ function fmtHours(h) {
             range="40–70%"
           />
           <HistoryChart
-            v-if="isAdvanced"
             title="Temperature"
             :series="tempHistory"
             color="#fbbf24"

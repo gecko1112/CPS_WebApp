@@ -6,10 +6,17 @@ const props = defineProps({
   // { active, profiles: {name: {target_moist, dry_days, suppress_daytime}}, editable }
   config: { type: Object, default: null },
   isOperator: { type: Boolean, default: false },
+  advanced: { type: Boolean, default: false }, // full param table vs. dropdown
 })
 const emit = defineEmits(['save'])
 
 const editable = computed(() => Boolean(props.config?.editable) && props.isOperator)
+const profileNames = computed(() => Object.keys(props.config?.profiles || {}))
+
+// Simple view: only switch the active plant, no parameter editing.
+function selectActive() {
+  emit('save', { active: active.value })
+}
 
 const active = ref(null)
 const rows = ref([]) // [{ name, target_moist, dry_days, suppress_daytime }]
@@ -53,7 +60,7 @@ function save() {
         <h3 class="text-sm font-semibold text-white/60">Plant profiles</h3>
       </div>
       <button
-        v-if="editable && dirty"
+        v-if="advanced && editable && dirty"
         type="button"
         @click="save"
         class="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-lg bg-plant-600 text-white hover:bg-plant-500 transition-colors"
@@ -66,6 +73,28 @@ function save() {
       No profile information available
     </div>
 
+    <!-- Simple view: just choose the plant -->
+    <div v-else-if="!advanced" class="flex items-center gap-3 flex-wrap">
+      <span class="text-sm text-white/60">Active plant:</span>
+      <select
+        v-if="editable"
+        v-model="active"
+        @change="selectActive"
+        class="bg-white/10 border border-white/15 rounded-lg px-3 py-1.5 text-sm text-white capitalize focus:border-plant-500 outline-none"
+      >
+        <option v-for="p in profileNames" :key="p" :value="p" class="bg-plant-900 text-white">
+          {{ p }}
+        </option>
+      </select>
+      <span v-else class="text-sm font-semibold text-white capitalize">
+        {{ active || 'Unknown' }}
+      </span>
+      <span v-if="!editable" class="text-xs text-white/30">
+        {{ config && !config.editable ? (config.note || '') : 'Operator role required to change.' }}
+      </span>
+    </div>
+
+    <!-- Expert view: full editable parameter table -->
     <div v-else class="overflow-x-auto -mx-1 px-1">
       <table class="w-full text-sm border-collapse">
         <thead>
