@@ -22,6 +22,7 @@ import WeatherCard from './WeatherCard.vue'
 import ComponentHealth from './ComponentHealth.vue'
 import PlantHealth from './PlantHealth.vue'
 import SystemDepiction from './SystemDepiction.vue'
+import WaterBackground from './WaterBackground.vue'
 
 const latest = ref(null)
 const status = ref(null)
@@ -127,12 +128,9 @@ function fmtHours(h) {
 </script>
 
 <template>
-  <div class="min-h-screen bg-plant-950 relative overflow-hidden">
-    <!-- Background blobs -->
-    <div class="fixed inset-0 overflow-hidden pointer-events-none">
-      <div class="blob w-[500px] h-[500px] bg-plant-800/30 -top-32 -right-32" style="animation-delay: -3s" />
-      <div class="blob w-[400px] h-[400px] bg-plant-600/20 bottom-0 -left-32" style="animation-delay: -12s" />
-    </div>
+  <div class="min-h-screen bg-slate-950 relative overflow-hidden">
+    <!-- Greyish / translucent water-droplet backdrop -->
+    <WaterBackground />
 
     <div class="relative z-10">
       <AppHeader transparent />
