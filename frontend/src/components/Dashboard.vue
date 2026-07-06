@@ -137,15 +137,15 @@ function fmtHours(h) {
     <div class="relative z-10">
       <AppHeader transparent />
 
-      <main class="max-w-5xl mx-auto p-4 space-y-4">
+      <main class="max-w-6xl mx-auto p-4">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
+          <!-- Left column: main content -->
+          <div class="lg:col-span-2 space-y-4">
         <!-- Plant health headline (most important for the everyday user) -->
         <PlantHealth :health="status?.plant_health" />
 
         <!-- Status banner -->
         <StatusBanner :status="status" />
-
-        <!-- Alerts panel -->
-        <AlertPanel :alerts="alerts" />
 
         <!-- Whole-system depiction: tank level + pump activity + plant -->
         <SystemDepiction
@@ -308,6 +308,15 @@ function fmtHours(h) {
 
         <p v-if="error" class="text-sm text-rose-400">{{ error }}</p>
         <p v-if="success" class="text-sm text-plant-300">{{ success }}</p>
+          </div>
+
+          <!-- Right column: alerts (visible, but not stacked up top) -->
+          <aside class="lg:col-span-1">
+            <div class="lg:sticky lg:top-20">
+              <AlertPanel :alerts="alerts" />
+            </div>
+          </aside>
+        </div>
       </main>
     </div>
 
