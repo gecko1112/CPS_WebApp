@@ -14,7 +14,7 @@ import router from '../router'
 import AppHeader from './AppHeader.vue'
 import SensorCard from './SensorCard.vue'
 import StatusBanner from './StatusBanner.vue'
-import HistoryChart from './HistoryChart.vue'
+import HistorySection from './HistorySection.vue'
 import AlertPanel from './AlertPanel.vue'
 import WateringHistory from './WateringHistory.vue'
 import PlantProfile from './PlantProfile.vue'
@@ -135,7 +135,7 @@ function fmtHours(h) {
     <div class="relative z-10">
       <AppHeader transparent />
 
-      <main class="max-w-6xl mx-auto p-4">
+      <main class="max-w-7xl mx-auto p-4">
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
           <!-- Left column: main content -->
           <div class="lg:col-span-2 space-y-4">
@@ -257,62 +257,31 @@ function fmtHours(h) {
           <WateringHistory v-if="isAdvanced" :events="wateringEvents" />
         </div>
 
-        <!-- Charts + time-range selector -->
-        <div class="space-y-3">
-          <div class="flex items-center justify-between">
-            <h3 class="text-sm font-semibold text-white/60">History</h3>
-            <div class="flex items-center rounded-lg bg-white/10 p-0.5 text-xs font-medium">
-              <button
-                v-for="opt in [
-                  { h: 1, l: 'Last hour' },
-                  { h: 12, l: 'Last 12h' },
-                  { h: 24, l: 'Last 24h' },
-                ]"
-                :key="opt.h"
-                type="button"
-                @click="setRange(opt.h)"
-                :class="[
-                  'px-2.5 py-1 rounded-md transition-colors',
-                  historyRange === opt.h
-                    ? 'bg-white/20 text-white'
-                    : 'text-white/50 hover:text-white',
-                ]"
-              >
-                {{ opt.l }}
-              </button>
-            </div>
-          </div>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <HistoryChart
-            title="Soil moisture"
-            :series="moistureHistory"
-            color="#34d399"
-            unit="%"
-            dark
-            hint="Soil moisture trend over the selected window. Watch for it dropping toward the dry threshold before a watering."
-            range="40–70%"
-          />
-          <HistoryChart
-            title="Temperature"
-            :series="tempHistory"
-            color="#fbbf24"
-            unit="°C"
-            dark
-            hint="Air temperature trend over the selected window."
-            range="18–26 °C"
-          />
-          </div>
-        </div>
+        <!-- History — side-by-side here in expert view; in simple view the
+             charts sit under the alerts on the right instead. -->
+        <HistorySection
+          v-if="isAdvanced"
+          :moisture="moistureHistory"
+          :temperature="tempHistory"
+          :range="historyRange"
+          @set-range="setRange"
+        />
 
         <p v-if="error" class="text-sm text-rose-400">{{ error }}</p>
         <p v-if="success" class="text-sm text-plant-300">{{ success }}</p>
           </div>
 
-          <!-- Right column: alerts (visible, but not stacked up top) -->
-          <aside class="lg:col-span-1">
-            <div class="lg:sticky lg:top-20">
-              <AlertPanel :alerts="alerts" />
-            </div>
+          <!-- Right column: alerts; in simple view the graphs stack under them -->
+          <aside class="lg:col-span-1 space-y-4">
+            <AlertPanel :alerts="alerts" />
+            <HistorySection
+              v-if="!isAdvanced"
+              stacked
+              :moisture="moistureHistory"
+              :temperature="tempHistory"
+              :range="historyRange"
+              @set-range="setRange"
+            />
           </aside>
         </div>
       </main>
