@@ -145,13 +145,6 @@ function fmtHours(h) {
         <!-- Status banner -->
         <StatusBanner :status="status" />
 
-        <!-- Whole-system depiction: tank level + pump activity + plant -->
-        <SystemDepiction
-          v-if="latest"
-          :tank="latest.tank"
-          :controller="latest.controller"
-        />
-
         <!-- Key stats (both views) -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <SensorCard
@@ -208,6 +201,13 @@ function fmtHours(h) {
             range="above 20%"
           />
         </div>
+
+        <!-- Whole-system depiction: tank level + pump activity + plant -->
+        <SystemDepiction
+          v-if="latest"
+          :tank="latest.tank"
+          :controller="latest.controller"
+        />
 
         <!-- Manual watering (+ tank time-to-empty in expert view) -->
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
