@@ -61,14 +61,16 @@ const levelText = computed(() => (level.value == null ? '—' : `${Math.round(le
       <!-- ===== Pump ===== -->
       <circle cx="210" cy="150" r="24"
               fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.3)" stroke-width="2" />
-      <g class="impeller" transform="translate(210 150)">
-        <g stroke="rgba(255,255,255,0.55)" stroke-width="3" stroke-linecap="round">
-          <line x1="0" y1="-11" x2="0" y2="11" />
-          <line x1="-11" y1="0" x2="11" y2="0" />
-          <line x1="-8" y1="-8" x2="8" y2="8" />
-          <line x1="-8" y1="8" x2="8" y2="-8" />
+      <g transform="translate(210 150)">
+        <g class="impeller">
+          <g stroke="rgba(255,255,255,0.55)" stroke-width="3" stroke-linecap="round">
+            <line x1="0" y1="-11" x2="0" y2="11" />
+            <line x1="-11" y1="0" x2="11" y2="0" />
+            <line x1="-8" y1="-8" x2="8" y2="8" />
+            <line x1="-8" y1="8" x2="8" y2="-8" />
+          </g>
+          <circle r="3" fill="rgba(255,255,255,0.8)" />
         </g>
-        <circle r="3" fill="rgba(255,255,255,0.8)" />
       </g>
       <text x="210" y="192" text-anchor="middle" class="cap">Pump</text>
 
