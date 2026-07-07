@@ -21,6 +21,7 @@ import random
 from collections import deque
 from datetime import UTC, datetime, timedelta
 
+from .alert_email import notify_critical_alerts
 from .components import COMPONENTS
 from .weather_util import weather_condition
 
@@ -51,32 +52,25 @@ _PLANT_PROFILES = {
 }
 
 
-# Rotating anomaly alerts (P08 AnomalyAlert shape) shown during the demo.
-_ALERT_TEMPLATES = [
-    {
-        "component": "p01/soil_moisture",
-        "alert_type": "process_fault",
-        "severity": "warning",
-        "observed_value": "0.42",
-        "description": "Soil moisture unchanged after watering completed — "
-        "check the water delivery path.",
-    },
-    {
-        "component": "p11/tank_level",
-        "alert_type": "sensor_fault",
-        "severity": "warning",
-        "observed_value": "105.3",
-        "description": "Tank level sensor reading exceeds 100% — recalibration needed.",
-    },
-    {
-        "component": "p05/controller",
-        "alert_type": "system_fault",
-        "severity": "critical",
-        "observed_value": "silent_for_30s",
-        "description": "Watering controller missed its heartbeat — the node may "
-        "be offline.",
-    },
-]
+# Demo alert story (P08 AnomalyAlert shape): the system starts healthy, then
+# exactly ONE warning and later ONE critical appear — no rotation, so the
+# demo (and the Mailpit inbox) never floods.
+_WARNING_ALERT = {
+    "component": "p11/tank_level",
+    "alert_type": "sensor_fault",
+    "severity": "warning",
+    "observed_value": "105.3",
+    "description": "Tank level sensor reading exceeds 100% — recalibration needed.",
+}
+
+_CRITICAL_ALERT = {
+    "component": "p02/pump",
+    "alert_type": "process_fault",
+    "severity": "critical",
+    "observed_value": "no_flow",
+    "description": "The pump ran but no water arrived at the plant — the pump "
+    "inlet may be blocked or the tank hose disconnected.",
+}
 
 
 class MockSensorService:
@@ -120,10 +114,10 @@ class MockSensorService:
             "timestamp": _now(),
         }
 
-        # Seed one active alert so the alert panel is populated on demo open.
-        first = {**_ALERT_TEMPLATES[0], "timestamp": _now()}
-        self.active_alerts: list[dict] = [first]
-        self.recent_alerts: deque[dict] = deque([first], maxlen=50)
+        # Start with no alerts: the demo opens on "All systems normal" and the
+        # warning/critical arrive later (see _generate_loop).
+        self.active_alerts: list[dict] = []
+        self.recent_alerts: deque[dict] = deque(maxlen=50)
 
         self.history: dict[str, deque[dict]] = {
             "moisture": deque(maxlen=history_size),
@@ -262,15 +256,17 @@ class MockSensorService:
                 }
             )
 
-            # Raise a fresh alert periodically (cycling templates) so the panel
-            # and the toast/notifications stay lively during a demo; cap active.
-            if self._tick % 20 == 0:
-                template = _ALERT_TEMPLATES[(self._tick // 20) % len(_ALERT_TEMPLATES)]
-                alert = {**template, "timestamp": now}
+            # Alert story: one warning ~40 s in, one critical ~2 min in (the
+            # critical also goes out by email, best-effort). Nothing repeats.
+            if self._tick == 20:
+                alert = {**_WARNING_ALERT, "timestamp": now}
                 self.active_alerts.append(alert)
                 self.recent_alerts.appendleft(alert)
-                if len(self.active_alerts) > 3:
-                    self.active_alerts.pop(0)
+            elif self._tick == 60:
+                alert = {**_CRITICAL_ALERT, "timestamp": now}
+                self.active_alerts.append(alert)
+                self.recent_alerts.appendleft(alert)
+                notify_critical_alerts([alert])
 
             # Occasionally drop one component offline (then restore it) so the
             # component-health strip visibly changes during a demo.
@@ -410,9 +406,10 @@ class MockSensorService:
                 self.last_watered_at.isoformat() if self.last_watered_at else None
             ),
             "active_alert_count": n_alerts,
-            # Plant health headline. Placeholder until P16 (Plant Health Model)
-            # ships a real score; for now derived from the overall status level.
-            "plant_health": "needs_attention" if level == "error" else "healthy",
+            # Plant health headline pinned to "healthy" in demo mode (P16 is
+            # vacant — placeholder per the presentation plan). The status
+            # banner still reacts to the demo alerts; the plant itself is fine.
+            "plant_health": "healthy",
             "demo_mode": True,
         }
 
