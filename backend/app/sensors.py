@@ -29,6 +29,7 @@ import schema.p08 as p08
 import schema.p11 as p11
 import schema.p12 as p12
 
+from .alert_email import notify_critical_alerts
 from .components import COMPONENTS, is_fresh
 from .p06_client import P06Client, group_events, latest_values, metric_series
 from .weather_util import weather_condition
@@ -277,6 +278,10 @@ class P06SensorService:
         self.active_alerts = [
             e for e in ordered if (e.get("timestamp") or "") >= cutoff
         ]
+        # Stretch: critical alerts also go out by email. The per-component
+        # cooldown in alert_email dedupes the same alert reappearing here on
+        # every poll cycle.
+        notify_critical_alerts(self.active_alerts)
 
     # -- read API (unchanged shapes) ----------------------------------------
 
