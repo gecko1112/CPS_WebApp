@@ -263,6 +263,7 @@ function fmtHours(h) {
           v-if="isAdvanced"
           :moisture="moistureHistory"
           :temperature="tempHistory"
+          :watering="wateringEvents"
           :range="historyRange"
           @set-range="setRange"
         />
@@ -279,6 +280,7 @@ function fmtHours(h) {
               stacked
               :moisture="moistureHistory"
               :temperature="tempHistory"
+              :watering="wateringEvents"
               :range="historyRange"
               @set-range="setRange"
             />

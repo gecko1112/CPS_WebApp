@@ -10,6 +10,45 @@ const props = defineProps({
   dark: { type: Boolean, default: false },
   hint: { type: String, default: '' },
   range: { type: String, default: '' },
+  // Watering events ({ timestamp, trigger }) drawn as vertical 💧 markers.
+  events: { type: Array, default: () => [] },
+})
+
+// Only annotate events inside the plotted time window (sky tone = water,
+// matching the tank card; dashed line + 💧 so it never relies on color alone).
+// The result is reference-memoized: the poll cycle replaces `series` every few
+// seconds, and an unstable reference here would recompute chartOptions and
+// force an ApexCharts updateOptions() (= flicker) on every poll.
+let _annCache = { key: '', value: [] }
+const eventAnnotations = computed(() => {
+  const pts = props.series || []
+  let xs = []
+  if (pts.length && props.events.length) {
+    const t0 = new Date(pts[0].t).getTime()
+    const t1 = new Date(pts[pts.length - 1].t).getTime()
+    xs = props.events
+      .map((e) => new Date(e.timestamp).getTime())
+      .filter((x) => x >= t0 && x <= t1)
+  }
+  const key = xs.join(',')
+  if (key !== _annCache.key) {
+    _annCache = {
+      key,
+      value: xs.map((x) => ({
+        x,
+        strokeDashArray: 4,
+        borderColor: 'rgba(56, 189, 248, 0.7)',
+        label: {
+          text: '💧',
+          borderWidth: 0,
+          orientation: 'horizontal',
+          offsetY: 6,
+          style: { background: 'transparent', color: '#38bdf8', fontSize: '13px' },
+        },
+      })),
+    }
+  }
+  return _annCache.value
 })
 
 const chartOptions = computed(() => ({
@@ -53,6 +92,7 @@ const chartOptions = computed(() => ({
     borderColor: props.dark ? 'rgba(255,255,255,0.07)' : '#e2e8f0',
     strokeDashArray: 4,
   },
+  annotations: { xaxis: eventAnnotations.value },
 }))
 
 const chartSeries = computed(() => [
@@ -66,9 +106,17 @@ const chartSeries = computed(() => [
 <template>
   <div :class="[dark ? 'glass' : 'bg-white shadow-sm', 'rounded-2xl p-4 sm:p-5 group relative']">
     <HintBubble v-if="hint" :title="title" :text="hint" :range="range" />
-    <h3 :class="['text-sm font-semibold mb-2', dark ? 'text-white/60' : 'text-slate-700']">
-      {{ title }}
-    </h3>
+    <div class="flex items-baseline justify-between mb-2">
+      <h3 :class="['text-sm font-semibold', dark ? 'text-white/60' : 'text-slate-700']">
+        {{ title }}
+      </h3>
+      <span
+        v-if="eventAnnotations.length"
+        :class="['text-[11px]', dark ? 'text-sky-300/70' : 'text-sky-600']"
+      >
+        💧 watering
+      </span>
+    </div>
     <apexchart
       v-if="series && series.length"
       type="area"

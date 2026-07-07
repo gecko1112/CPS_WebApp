@@ -4,6 +4,7 @@ import HistoryChart from './HistoryChart.vue'
 defineProps({
   moisture: { type: Array, default: () => [] },
   temperature: { type: Array, default: () => [] },
+  watering: { type: Array, default: () => [] }, // watering events → 💧 markers
   range: { type: Number, default: 24 }, // hours
   stacked: { type: Boolean, default: false }, // stacked vs. side-by-side
 })
@@ -40,10 +41,11 @@ const RANGES = [
       <HistoryChart
         title="Soil moisture"
         :series="moisture"
+        :events="watering"
         color="#34d399"
         unit="%"
         dark
-        hint="Soil moisture trend over the selected window. Watch for it dropping toward the dry threshold before a watering."
+        hint="Soil moisture trend over the selected window. Watch for it dropping toward the dry threshold before a watering. 💧 marks a watering event."
         range="40–70%"
       />
       <HistoryChart
