@@ -257,26 +257,14 @@ function fmtHours(h) {
           <WateringHistory v-if="isAdvanced" :events="wateringEvents" />
         </div>
 
-        <!-- History — side-by-side here in expert view; in simple view the
-             charts sit under the alerts on the right instead. -->
-        <HistorySection
-          v-if="isAdvanced"
-          :moisture="moistureHistory"
-          :temperature="tempHistory"
-          :watering="wateringEvents"
-          :range="historyRange"
-          @set-range="setRange"
-        />
-
         <p v-if="error" class="text-sm text-rose-400">{{ error }}</p>
         <p v-if="success" class="text-sm text-plant-300">{{ success }}</p>
           </div>
 
-          <!-- Right column: alerts; in simple view the graphs stack under them -->
+          <!-- Right column: alerts with the graphs stacked under them (both views) -->
           <aside class="lg:col-span-1 space-y-4">
             <AlertPanel :alerts="alerts" />
             <HistorySection
-              v-if="!isAdvanced"
               stacked
               :moisture="moistureHistory"
               :temperature="tempHistory"
