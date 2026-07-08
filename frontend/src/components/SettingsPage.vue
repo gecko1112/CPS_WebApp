@@ -32,7 +32,7 @@ async function sendTestEmail() {
 
 const LANDING_KEY = 'plantcps_landing'
 
-const landing = ref(localStorage.getItem(LANDING_KEY) || 'welcome')
+const landing = ref(localStorage.getItem(LANDING_KEY) || 'dashboard')
 const saved = ref(false)
 
 function save() {
@@ -74,8 +74,10 @@ const notifStatus = computed(() => {
       <main class="max-w-2xl mx-auto p-4 sm:p-8 space-y-6">
         <h2 class="text-2xl font-bold text-white">Settings</h2>
 
-        <!-- Landing page preference -->
-        <div class="glass rounded-2xl p-5 sm:p-6 space-y-4">
+        <!-- Landing page preference — parked while the welcome page is removed
+             from the flow (only one destination left). Re-enable by changing
+             v-if to true when the welcome page returns. -->
+        <div v-if="false" class="glass rounded-2xl p-5 sm:p-6 space-y-4">
           <div>
             <h3 class="font-semibold text-white mb-1">Default landing page</h3>
             <p class="text-sm text-white/50">Choose which page you see after logging in.</p>

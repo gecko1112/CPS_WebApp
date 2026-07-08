@@ -18,7 +18,8 @@ async function submit() {
   loading.value = true
   try {
     await login(email.value, password.value)
-    const preferred = localStorage.getItem('plantcps_landing') || 'welcome'
+    const stored = localStorage.getItem('plantcps_landing')
+    const preferred = stored && stored !== 'welcome' ? stored : 'dashboard'
     router.push({ name: preferred })
   } catch (e) {
     error.value = 'Login failed. Check email and password.'
@@ -29,14 +30,25 @@ async function submit() {
 </script>
 
 <template>
-  <div class="min-h-screen flex items-center justify-center p-4 bg-plant-950">
-    <!-- Background blobs -->
+  <div class="min-h-screen flex items-center justify-center p-4 bg-plant-950 relative overflow-hidden">
+    <!-- Video background (same clip as the welcome page) -->
+    <video
+      autoplay muted loop playsinline
+      class="absolute inset-0 w-full h-full video-bg pointer-events-none"
+      src="/plant-bg.mp4"
+      @error="$event.target.style.display='none'"
+    />
+
+    <!-- Animated blob fallback (shows when video is missing) -->
     <div class="absolute inset-0 overflow-hidden">
       <div class="blob w-[500px] h-[500px] bg-plant-700/30 -top-32 -right-32" style="animation-delay: 0s" />
       <div class="blob w-[400px] h-[400px] bg-plant-500/20 bottom-0 -left-32" style="animation-delay: -10s" />
     </div>
 
-    <div class="relative w-full max-w-sm glass rounded-2xl p-6 sm:p-8">
+    <!-- Dark overlay for card contrast -->
+    <div class="absolute inset-0 bg-gradient-to-b from-plant-950/60 via-plant-950/40 to-plant-950/80" />
+
+    <div class="relative z-10 w-full max-w-sm glass rounded-2xl p-6 sm:p-8">
       <div class="flex items-center gap-3 mb-6">
         <div class="bg-plant-600 p-2 rounded-xl">
           <Sprout class="w-6 h-6 text-white" />

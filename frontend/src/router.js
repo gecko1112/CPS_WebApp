@@ -8,7 +8,10 @@ import SettingsPage from './components/SettingsPage.vue'
 
 const routes = [
   { path: '/login', name: 'login', component: LoginScreen, meta: { guest: true } },
-  { path: '/', name: 'welcome', component: WelcomePage },
+  // Welcome page is parked for now: users land straight on the dashboard.
+  // The page stays reachable at /welcome so the code keeps working.
+  { path: '/', redirect: '/dashboard' },
+  { path: '/welcome', name: 'welcome', component: WelcomePage },
   { path: '/dashboard', name: 'dashboard', component: Dashboard },
   { path: '/settings', name: 'settings', component: SettingsPage },
 ]
@@ -26,7 +29,9 @@ router.beforeEach((to) => {
   }
 
   if (to.name === 'login' && isAuthenticated) {
-    const preferred = localStorage.getItem('plantcps_landing') || 'welcome'
+    // 'welcome' prefs from before the page was parked fall back to dashboard.
+    const stored = localStorage.getItem('plantcps_landing')
+    const preferred = stored && stored !== 'welcome' ? stored : 'dashboard'
     return { name: preferred }
   }
 })
