@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -148,15 +149,31 @@ class P06Client:
             return False
 
     async def window(self, topic: str, start: str = "-15m") -> list[dict[str, Any]]:
-        """Rows for a topic over a relative window (e.g. '-15m'). For 'latest'."""
+        """Rows for a topic over a relative window (e.g. '-15m'). For 'latest'.
+
+        Implemented via /query (absolute from/to): P06's /data alias builds
+        ``range(stop: now)`` — a Flux type error (bare ``now`` is a function),
+        so every /data call 500s. /query interpolates parsed RFC3339 times and
+        works. Reported to P06; revisit if they fix /data.
+        """
+        m = re.fullmatch(r"-(\d+)([smhdw])", start)
+        if not m:
+            log.warning("P06 window: bad relative start %r", start)
+            return []
+        unit_s = {"s": 1, "m": 60, "h": 3600, "d": 86400, "w": 604800}
+        seconds = int(m.group(1)) * unit_s[m.group(2)]
+        now = datetime.now(UTC)
+        params = {
+            "topic": topic,
+            "from": (now - timedelta(seconds=seconds)).isoformat(),
+            "to": now.isoformat(),
+        }
         try:
-            resp = await self._client.get(
-                "/data", params={"start": start, "stop": "now", "topic": topic}
-            )
+            resp = await self._client.get("/query", params=params)
             resp.raise_for_status()
             return resp.json().get("rows", [])
         except Exception as exc:  # noqa: BLE001
-            log.warning("P06 /data topic=%s failed: %s", topic, exc)
+            log.warning("P06 /query (window) topic=%s failed: %s", topic, exc)
             return []
 
     async def history(
