@@ -141,14 +141,16 @@ PIDS+=($!)
 echo "==> Starting frontend (:5173) ..."
 (
   cd "$REPO_ROOT/frontend"
-  npm run dev
+  npm run dev -- --host   # --host: reachable from phones on the same WiFi
 ) &
 PIDS+=($!)
 
 sleep 3
 echo ""
 echo "────────────────────────────────────────────────────────"
+LAN_IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
 echo "  App:      http://localhost:5173"
+[ -n "$LAN_IP" ] && echo "  Phone:    http://$LAN_IP:5173  (same WiFi)"
 echo "  API docs: http://localhost:8000/docs"
 $EMAIL && echo "  Mailpit:  http://localhost:8025"
 [ "$MODE" = full ] && echo "  P06 API:  http://localhost:8088/health"
