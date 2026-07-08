@@ -302,9 +302,16 @@ class P06SensorService:
         if source is None or self._client is None:
             return []
         topic, measurement, scale = source
+        # P06's materialized aggregates rename the measurement (<name>_5m) and
+        # split each point into mean/min/max/count fields — select the mean.
         downsample = "1m" if hours <= 1 else "5m"
         rows = await self._client.history(topic, hours=hours, downsample=downsample)
-        pts = metric_series(rows, measurement, scale=scale)
+        pts = metric_series(rows, f"{measurement}_{downsample}", scale=scale, field="mean")
+        if not pts:
+            # Aggregator not running (or no aggregates yet) — fall back to raw
+            # points; our max_points step-sampling below bounds the payload.
+            rows = await self._client.history(topic, hours=hours, downsample=None)
+            pts = metric_series(rows, measurement, scale=scale)
         if len(pts) > max_points:
             step = len(pts) / max_points
             pts = [pts[int(i * step)] for i in range(max_points)]

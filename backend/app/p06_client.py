@@ -74,9 +74,17 @@ def latest_values(rows: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def metric_series(
-    rows: list[dict[str, Any]], measurement: str, scale: float = 1.0
+    rows: list[dict[str, Any]],
+    measurement: str,
+    scale: float = 1.0,
+    field: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Time-ordered ``[{"t": <rfc3339>, "v": <value>}]`` for one measurement."""
+    """Time-ordered ``[{"t": <rfc3339>, "v": <value>}]`` for one measurement.
+
+    ``field`` selects one field per point — needed for P06's materialized
+    aggregates (measurement ``<name>_5m``), where each point carries
+    mean/min/max/count fields; pass ``field="mean"`` to avoid mixing them.
+    """
     pts = [
         {
             "t": r["time"],
@@ -87,7 +95,9 @@ def metric_series(
             ),
         }
         for r in rows
-        if r.get("measurement") == measurement and r.get("value") is not None
+        if r.get("measurement") == measurement
+        and (field is None or r.get("field") == field)
+        and r.get("value") is not None
     ]
     pts.sort(key=lambda p: p["t"])
     return pts
