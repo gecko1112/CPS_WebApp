@@ -30,6 +30,22 @@ function timeAgo(iso) {
   if (mins < 60) return `${mins}m ago`
   return `${Math.floor(mins / 60)}h ago`
 }
+
+// Absolute local time (course requirement: alerts with timestamps).
+// UTC from the backend, converted via Intl; date shown only when not today.
+function fmtTime(iso) {
+  const d = new Date(iso)
+  const time = new Intl.DateTimeFormat(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(d)
+  if (d.toDateString() === new Date().toDateString()) return time
+  const day = new Intl.DateTimeFormat(undefined, {
+    day: '2-digit',
+    month: '2-digit',
+  }).format(d)
+  return `${day} ${time}`
+}
 </script>
 
 <template>
@@ -56,7 +72,9 @@ function timeAgo(iso) {
               {{ alert.severity }}
             </span>
             <span class="text-xs opacity-60">{{ typeLabel(alert.alert_type) }}</span>
-            <span class="text-xs opacity-40 ml-auto">{{ timeAgo(alert.timestamp) }}</span>
+            <span class="text-xs opacity-40 ml-auto tabular-nums">
+              {{ fmtTime(alert.timestamp) }} · {{ timeAgo(alert.timestamp) }}
+            </span>
           </div>
           <p class="text-sm mt-0.5 leading-snug text-white/80">{{ alert.description }}</p>
         </div>
