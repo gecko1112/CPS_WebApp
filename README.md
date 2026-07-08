@@ -40,10 +40,10 @@ other groups → MQTT broker → P06 logger (InfluxDB + HTTP query API)
 ### One command (recommended)
 
 ```bash
-./scripts/start-demo.sh              # DEMO: mock data + Mailpit email demo
-./scripts/start-demo.sh --real       # REAL: broker + backend; P06 expected on :8088
-./scripts/start-demo.sh --full       # REAL + local P06 stack (InfluxDB, logger, query API, aggregator)
-./scripts/start-demo.sh --no-email   # any mode without Mailpit/email
+./scripts/start.sh              # DEMO: mock data + Mailpit email demo
+./scripts/start.sh --real       # REAL: broker + backend; P06 expected on :8088
+./scripts/start.sh --full       # REAL + local P06 stack (InfluxDB, logger, query API, aggregator)
+./scripts/start.sh --no-email   # any mode without Mailpit/email
 ```
 
 Starts backend (`:8000`), frontend (`:5173`), and Mailpit (`:8025`); `--real`/`--full` add the Mosquitto broker (`:1883`) and, for `--full`, the monorepo's P06 pipeline (`:8086`/`:8088`). Skips anything already running; Ctrl+C stops everything it started. Note: `--full` provides the pipeline — actual sensor *data* still needs the other groups' publishers (run `uv run mprocs` in the monorepo for a full simulation).

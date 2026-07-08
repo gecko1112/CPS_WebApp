@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# scripts/start-demo.sh — start the whole P13 stack with one command.
+# scripts/start.sh — start the whole P13 stack with one command.
 #
-#   ./scripts/start-demo.sh              # DEMO: mock data + Mailpit email demo
-#   ./scripts/start-demo.sh --real       # REAL: broker + our backend; P06 runs elsewhere
-#   ./scripts/start-demo.sh --full       # REAL + local P06 stack (InfluxDB, logger,
-#                                        #   query API, aggregator) from ../monorepo
-#   ./scripts/start-demo.sh --no-email   # any mode without Mailpit/email
+#   ./scripts/start.sh              # DEMO: mock data + Mailpit email demo
+#   ./scripts/start.sh --real       # REAL: broker + our backend; P06 runs elsewhere
+#   ./scripts/start.sh --full       # REAL + local P06 stack (InfluxDB, logger,
+#                                   #   query API, aggregator) from ../monorepo
+#   ./scripts/start.sh --no-email   # any mode without Mailpit/email
 #
 # Always starts (foreground, Ctrl+C stops everything):
 #   * backend  — uvicorn on :8000  (MOCK_DATA=true in demo mode)
@@ -17,6 +17,10 @@
 # NOTE (--full): P06 logs whatever is published on the bus — actual sensor DATA
 # still needs the other groups' publishers (run them via mprocs in ../monorepo).
 # For the Pi/monorepo single-process deployment use mprocs there instead.
+#
+# Division of responsibility: on the Pi, P06 runs InfluxDB + logger/API
+# themselves — use --real there. --full exists so ONE person on ONE laptop can
+# run the entire real pipeline without P06 around (we temporarily "play P06").
 
 set -euo pipefail
 
@@ -82,10 +86,32 @@ if [ "$MODE" = full ]; then
   if port_up 8086; then
     echo "==> InfluxDB already running (:8086)"
   else
-    echo "==> Starting InfluxDB (docker compose, monorepo) ..."
-    (cd "$MONOREPO" && docker compose up -d influxdb >/dev/null)
+    echo "==> Starting InfluxDB ..."
+    if docker compose version >/dev/null 2>&1; then
+      (cd "$MONOREPO" && docker compose up -d influxdb >/dev/null)
+    elif command -v docker-compose >/dev/null; then
+      (cd "$MONOREPO" && docker-compose up -d influxdb >/dev/null)
+    else
+      # No compose installed — replicate the monorepo's influxdb service.
+      # Named volumes keep the data across restarts, same as compose.
+      docker run -d --name cps-influxdb -p 8086:8086 \
+        -e DOCKER_INFLUXDB_INIT_MODE=setup \
+        -e DOCKER_INFLUXDB_INIT_USERNAME=admin \
+        -e DOCKER_INFLUXDB_INIT_PASSWORD=changeme123 \
+        -e DOCKER_INFLUXDB_INIT_ORG="${INFLUX_ORG:-cps}" \
+        -e DOCKER_INFLUXDB_INIT_BUCKET="${INFLUX_BUCKET:-cps_raw}" \
+        -e DOCKER_INFLUXDB_INIT_RETENTION=7d \
+        -e DOCKER_INFLUXDB_INIT_ADMIN_TOKEN="${INFLUX_TOKEN:-dev-token-change-me}" \
+        -v cps_influxdb_data:/var/lib/influxdb2 \
+        -v cps_influxdb_config:/etc/influxdb2 \
+        influxdb:2.7 >/dev/null \
+        || docker start cps-influxdb >/dev/null   # container exists from a previous run
+    fi
   fi
-  until port_up 8086; do sleep 1; done
+  # The port opens before Influx finishes first-run setup — wait for health.
+  echo -n "    waiting for InfluxDB to be ready "
+  until curl -fsS http://localhost:8086/health >/dev/null 2>&1; do echo -n "."; sleep 1; done
+  echo " ok"
 
   echo "==> Starting P06 logger + query API + aggregator ..."
   (cd "$MONOREPO" && env "${P06_ENV[@]}" MQTT_BROKER=localhost \
