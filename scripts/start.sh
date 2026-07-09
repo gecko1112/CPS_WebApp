@@ -39,15 +39,36 @@ for arg in "$@"; do
 done
 
 PIDS=()
+# Each service runs in its OWN process group (setsid), so cleanup can kill the
+# whole tree (uv -> uvicorn -> reload worker, npm -> sh -> node). Killing just
+# the top pid orphans the grandchildren, which then keep ports 8000/5173 and
+# serve STALE data on the next start.
 cleanup() {
   echo ""
   echo "==> Stopping ..."
-  for pid in "${PIDS[@]}"; do kill "$pid" 2>/dev/null || true; done
+  for pid in "${PIDS[@]}"; do kill -TERM -- "-$pid" 2>/dev/null || true; done
+  sleep 1
+  for pid in "${PIDS[@]}"; do kill -KILL -- "-$pid" 2>/dev/null || true; done
+  # Fallback: pattern-kill anything that escaped its process group (uv/npm
+  # re-spawn children); a survivor here keeps :8000/:5173 and serves stale data.
+  pkill -f 'uvicorn app.main' 2>/dev/null || true
+  pkill -f 'vite --host' 2>/dev/null || true
+  pkill -f 'p06_data_logging_visualisation' 2>/dev/null || true
   wait 2>/dev/null || true
 }
 trap cleanup EXIT INT TERM
 
 port_up() { nc -z localhost "$1" 2>/dev/null; }
+
+# Refuse to start over a stale instance — otherwise the new backend can't bind
+# and the browser keeps talking to the OLD one (frozen alerts, old code).
+for p in 8000 5173; do
+  if port_up "$p"; then
+    echo "ERROR: port $p is already in use — a previous run is still alive." >&2
+    echo "       Stop it first:  pkill -f 'uvicorn app.main' ; pkill -f vite" >&2
+    exit 1
+  fi
+done
 
 # --- Mailpit (email demo) ----------------------------------------------------
 if $EMAIL; then
@@ -114,11 +135,11 @@ if [ "$MODE" = full ]; then
   echo " ok"
 
   echo "==> Starting P06 logger + query API + aggregator ..."
-  (cd "$MONOREPO" && env "${P06_ENV[@]}" MQTT_BROKER=localhost \
+  (cd "$MONOREPO" && exec setsid env "${P06_ENV[@]}" MQTT_BROKER=localhost \
      uv run --package p06_data_logging_visualisation p06-logger) & PIDS+=($!)
-  (cd "$MONOREPO" && env "${P06_ENV[@]}" API_HOST=0.0.0.0 API_PORT=8088 \
+  (cd "$MONOREPO" && exec setsid env "${P06_ENV[@]}" API_HOST=0.0.0.0 API_PORT=8088 \
      uv run --package p06_data_logging_visualisation p06-api) & PIDS+=($!)
-  (cd "$MONOREPO" && env "${P06_ENV[@]}" \
+  (cd "$MONOREPO" && exec setsid env "${P06_ENV[@]}" \
      uv run --package p06_data_logging_visualisation p06-aggregator) & PIDS+=($!)
 fi
 
@@ -133,7 +154,7 @@ BACKEND_ENV=()
 $EMAIL && BACKEND_ENV+=("EMAIL_ENABLED=true")
 (
   cd "$REPO_ROOT/backend"
-  env "${BACKEND_ENV[@]}" uv run uvicorn app.main:app --reload
+  exec setsid env "${BACKEND_ENV[@]}" uv run uvicorn app.main:app --reload
 ) &
 PIDS+=($!)
 
@@ -141,7 +162,8 @@ PIDS+=($!)
 echo "==> Starting frontend (:5173) ..."
 (
   cd "$REPO_ROOT/frontend"
-  npm run dev -- --host   # --host: reachable from phones on the same WiFi
+  # --host: reachable from phones on the same WiFi
+  exec setsid npm run dev -- --host
 ) &
 PIDS+=($!)
 
