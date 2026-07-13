@@ -20,6 +20,7 @@ import logging
 import os
 from collections import deque
 from datetime import UTC, datetime, timedelta
+from typing import TypedDict
 
 import schema.p01 as p01
 import schema.p03 as p03
@@ -61,18 +62,70 @@ def _num(value: object) -> float | None:
     return value if isinstance(value, (int, float)) else None
 
 
+class SoilMoistureState(TypedDict):
+    calibrated: float | None
+    raw_adc: int | None
+    status: str
+    timestamp: str | None
+
+
+class ControllerState(TypedDict):
+    state: str
+    reason: str | None
+    timestamp: str | None
+
+
+class WeatherState(TypedDict):
+    condition: str
+    temperature_c: float | None
+    precipitation_mm: float | None
+    solar_radiation_wm2: float | None
+    horizon_label: str
+    confidence: float | None
+    status: str
+    timestamp: str | None
+
+
+class TankState(TypedDict):
+    level_pct: float | None
+    volume_l: float | None
+    sensor_distance_mm: float | None
+    status: str
+    timestamp: str | None
+
+
+class TankForecastState(TypedDict):
+    time_to_empty_h: float | None
+    confidence_h: float | None
+    status: str
+    timestamp: str | None
+
+
+class PowerState(TypedDict):
+    battery_soc: float | None
+    charging_rate_w: float | None
+    time_to_discharge_h: float | None
+    mode: str
+    status: str
+    timestamp: str | None
+
+
 class P06SensorService:
     def __init__(self) -> None:
         # Latest-reading cache. Same keys the frontend already consumes;
         # initialised to "no data yet" until the first successful poll.
-        self.soil_moisture = {
+        self.soil_moisture: SoilMoistureState = {
             "calibrated": None,
             "raw_adc": None,
             "status": "unavailable",
             "timestamp": None,
         }
-        self.controller = {"state": "unknown", "reason": None, "timestamp": None}
-        self.weather = {
+        self.controller: ControllerState = {
+            "state": "unknown",
+            "reason": None,
+            "timestamp": None,
+        }
+        self.weather: WeatherState = {
             "condition": "unknown",
             "temperature_c": None,
             "precipitation_mm": None,
@@ -82,20 +135,20 @@ class P06SensorService:
             "status": "unavailable",
             "timestamp": None,
         }
-        self.tank = {
+        self.tank: TankState = {
             "level_pct": None,
             "volume_l": None,
             "sensor_distance_mm": None,
             "status": "unavailable",
             "timestamp": None,
         }
-        self.tank_forecast = {
+        self.tank_forecast: TankForecastState = {
             "time_to_empty_h": None,
             "confidence_h": None,
             "status": "unavailable",
             "timestamp": None,
         }
-        self.power = {
+        self.power: PowerState = {
             "battery_soc": None,
             "charging_rate_w": None,
             "time_to_discharge_h": None,
@@ -145,34 +198,33 @@ class P06SensorService:
         # Fetch P06 health + all latest windows + the alert log concurrently.
         # window()/history() swallow errors and return [], so connectivity is
         # judged from /health, not from whether a cycle raised.
-        (
-            health,
-            soil,
-            ctrl,
-            tank,
-            forecast,
-            power,
-            weather,
-            anomalies,
-        ) = await asyncio.gather(
-            c.health(),
-            c.window(p01.SoilReadingTopic.address),
-            c.window(p05.ControllerStateTopic.address),
-            c.window(p11.LevelTopic.address),
-            c.window(p11.ForecastTopic.address),
-            c.window(p12.PowerReadingTopic.address),
-            c.window(p07.ForecastTopic.address, start="-6h"),  # 2 h cadence
-            c.history(p08.AnomalyAlertTopic.address, hours=24, downsample=None),
-        )
-        self._connected = bool(health)
+        #
+        # asyncio.gather()'s typeshed overloads only preserve per-argument
+        # types up to 5 awaitables; beyond that it collapses to one shared
+        # TypeVar, so 8 heterogeneous awaitables would type-erase to a union.
+        # TaskGroup keeps each task's own return type via Task[T].result().
+        async with asyncio.TaskGroup() as tg:
+            health_task = tg.create_task(c.health())
+            soil_task = tg.create_task(c.window(p01.SoilReadingTopic.address))
+            ctrl_task = tg.create_task(c.window(p05.ControllerStateTopic.address))
+            tank_task = tg.create_task(c.window(p11.LevelTopic.address))
+            forecast_task = tg.create_task(c.window(p11.ForecastTopic.address))
+            power_task = tg.create_task(c.window(p12.PowerReadingTopic.address))
+            weather_task = tg.create_task(
+                c.window(p07.ForecastTopic.address, start="-6h")  # 2 h cadence
+            )
+            anomalies_task = tg.create_task(
+                c.history(p08.AnomalyAlertTopic.address, hours=24, downsample=None)
+            )
+        self._connected = bool(health_task.result())
 
-        self._apply_soil(latest_values(soil))
-        self._apply_controller(latest_values(ctrl))
-        self._apply_tank(latest_values(tank))
-        self._apply_tank_forecast(latest_values(forecast))
-        self._apply_power(latest_values(power))
-        self._apply_weather(latest_values(weather))
-        self._apply_alerts(group_events(anomalies))
+        self._apply_soil(latest_values(soil_task.result()))
+        self._apply_controller(latest_values(ctrl_task.result()))
+        self._apply_tank(latest_values(tank_task.result()))
+        self._apply_tank_forecast(latest_values(forecast_task.result()))
+        self._apply_power(latest_values(power_task.result()))
+        self._apply_weather(latest_values(weather_task.result()))
+        self._apply_alerts(group_events(anomalies_task.result()))
 
     # -- latest-reading mappers (only overwrite when P06 returned data) -----
 
@@ -306,7 +358,9 @@ class P06SensorService:
         # split each point into mean/min/max/count fields — select the mean.
         downsample = "1m" if hours <= 1 else "5m"
         rows = await self._client.history(topic, hours=hours, downsample=downsample)
-        pts = metric_series(rows, f"{measurement}_{downsample}", scale=scale, field="mean")
+        pts = metric_series(
+            rows, f"{measurement}_{downsample}", scale=scale, field="mean"
+        )
         if not pts:
             # Aggregator not running (or no aggregates yet) — fall back to raw
             # points; our max_points step-sampling below bounds the payload.

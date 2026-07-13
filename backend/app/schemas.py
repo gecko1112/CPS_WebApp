@@ -1,4 +1,5 @@
 """Pydantic schemas for fastapi-users I/O."""
+
 from __future__ import annotations
 
 import uuid

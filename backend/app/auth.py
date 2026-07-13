@@ -2,16 +2,17 @@
 fastapi-users wiring: user manager, JWT auth backend, role guards, admin seeding.
 
 Auth URLs (mounted in main.py):
-  POST /api/auth/jwt/login   → form-encoded email + password → {access_token, token_type}
+  POST /api/auth/jwt/login   → form-encoded email + password
+                               → {access_token, token_type}
   POST /api/auth/jwt/logout  → revoke (stateless JWT = no-op)
   POST /api/auth/register    → self-service signup (creates viewer)
   GET  /api/users/me         → current user details (includes role)
 """
+
 from __future__ import annotations
 
 import os
 import uuid
-from typing import Optional
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi_users import BaseUserManager, FastAPIUsers, UUIDIDMixin
@@ -21,7 +22,6 @@ from fastapi_users.authentication import (
     JWTStrategy,
 )
 from fastapi_users.password import PasswordHelper
-from fastapi_users_db_sqlalchemy import SQLAlchemyUserDatabase
 from sqlalchemy import select
 
 from .db import Base, SessionLocal, engine, get_user_db
@@ -35,7 +35,7 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     reset_password_token_secret = SECRET
     verification_token_secret = SECRET
 
-    async def on_after_register(self, user: User, request: Optional[Request] = None):
+    async def on_after_register(self, user: User, request: Request | None = None):
         print(f"User registered: {user.email} (role={user.role})")
 
 
@@ -65,7 +65,10 @@ current_active_user = fastapi_users.current_user(active=True)
 # Role guards
 # ---------------------------------------------------------------------------
 def require_operator(user: User = Depends(current_active_user)) -> User:
-    if user.role not in (Role.OPERATOR.value, Role.ADMIN.value) and not user.is_superuser:
+    if (
+        user.role not in (Role.OPERATOR.value, Role.ADMIN.value)
+        and not user.is_superuser
+    ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Operator role required for this action",
@@ -95,22 +98,28 @@ _password_helper = PasswordHelper()
 
 
 async def _seed_users() -> None:
-    admin_email = os.getenv("ADMIN_EMAIL")
-    admin_pw = os.getenv("ADMIN_PASSWORD")
-    seed_dev = os.getenv("SEED_DEV_USERS", "true").lower() in ("1", "true", "yes")
-
+    if os.getenv("SEED_DEV_USERS", "true").lower() not in ("1", "true", "yes"):
+        return
     async with SessionLocal() as session:
-        if admin_email and admin_pw:
-            await _create_if_missing(
-                session, admin_email, admin_pw, Role.ADMIN, is_superuser=True
-            )
-        if seed_dev:
-            await _create_if_missing(
-                session, "viewer@example.com", "viewer123", Role.VIEWER
-            )
-            await _create_if_missing(
-                session, "operator@example.com", "operator123", Role.OPERATOR
-            )
+        await _create_if_missing(
+            session,
+            os.getenv("ADMIN_EMAIL", "admin@example.com"),
+            os.getenv("ADMIN_PASSWORD", "admin123"),
+            Role.ADMIN,
+            is_superuser=True,
+        )
+        await _create_if_missing(
+            session,
+            os.getenv("VIEWER_EMAIL", "viewer@example.com"),
+            os.getenv("VIEWER_PASSWORD", "viewer123"),
+            Role.VIEWER,
+        )
+        await _create_if_missing(
+            session,
+            os.getenv("OPERATOR_EMAIL", "operator@example.com"),
+            os.getenv("OPERATOR_PASSWORD", "operator123"),
+            Role.OPERATOR,
+        )
         await session.commit()
 
 
@@ -121,7 +130,7 @@ async def _create_if_missing(
     role: Role,
     is_superuser: bool = False,
 ) -> None:
-    existing = await session.scalar(select(User).where(User.email == email))
+    existing = await session.scalar(select(User).filter_by(email=email))
     if existing:
         return
     session.add(

@@ -20,6 +20,7 @@ import math
 import random
 from collections import deque
 from datetime import UTC, datetime, timedelta
+from typing import TypedDict
 
 from .alert_email import notify_critical_alerts
 from .components import COMPONENTS
@@ -28,6 +29,54 @@ from .weather_util import weather_condition
 
 def _now() -> str:
     return datetime.now(tz=UTC).isoformat()
+
+
+class SoilMoistureState(TypedDict):
+    calibrated: float
+    raw_adc: int
+    status: str
+    timestamp: str
+
+
+class ControllerState(TypedDict):
+    state: str
+    reason: str | None
+    timestamp: str
+
+
+class WeatherState(TypedDict):
+    condition: str
+    temperature_c: float
+    precipitation_mm: float
+    solar_radiation_wm2: float
+    horizon_label: str
+    confidence: float
+    status: str
+    timestamp: str
+
+
+class TankState(TypedDict):
+    level_pct: float
+    volume_l: float
+    sensor_distance_mm: float
+    status: str
+    timestamp: str
+
+
+class TankForecastState(TypedDict):
+    time_to_empty_h: float
+    confidence_h: float | None
+    status: str
+    timestamp: str
+
+
+class PowerState(TypedDict):
+    battery_soc: float
+    charging_rate_w: float
+    time_to_discharge_h: float
+    mode: str
+    status: str
+    timestamp: str
 
 
 # (precipitation_mm, solar_radiation_wm2) pairs the demo rotates through so the
@@ -75,14 +124,18 @@ _CRITICAL_ALERT = {
 
 class MockSensorService:
     def __init__(self, history_size: int = 20000) -> None:
-        self.soil_moisture = {
+        self.soil_moisture: SoilMoistureState = {
             "calibrated": 0.45,
             "raw_adc": 1847,
             "status": "ok",
             "timestamp": _now(),
         }
-        self.controller = {"state": "idle", "reason": None, "timestamp": _now()}
-        self.weather = {
+        self.controller: ControllerState = {
+            "state": "idle",
+            "reason": None,
+            "timestamp": _now(),
+        }
+        self.weather: WeatherState = {
             "condition": weather_condition(0.6, 160.0),
             "temperature_c": 22.0,
             "precipitation_mm": 0.6,
@@ -92,20 +145,20 @@ class MockSensorService:
             "status": "live",
             "timestamp": _now(),
         }
-        self.tank = {
+        self.tank: TankState = {
             "level_pct": 78.0,
             "volume_l": 15.6,
             "sensor_distance_mm": 120.0,
             "status": "ok",
             "timestamp": _now(),
         }
-        self.tank_forecast = {
+        self.tank_forecast: TankForecastState = {
             "time_to_empty_h": 72.0,
             "confidence_h": 6.0,
             "status": "ok",
             "timestamp": _now(),
         }
-        self.power = {
+        self.power: PowerState = {
             "battery_soc": 85.0,
             "charging_rate_w": 12.5,
             "time_to_discharge_h": 48.0,

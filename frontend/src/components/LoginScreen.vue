@@ -90,6 +90,7 @@ async function submit() {
         <p class="font-semibold mb-1 text-white/60">Test accounts:</p>
         <p>viewer@example.com / viewer123 — read only</p>
         <p>operator@example.com / operator123 — can water</p>
+        <p>admin@example.com / admin123 — full access</p>
       </div>
     </div>
   </div>

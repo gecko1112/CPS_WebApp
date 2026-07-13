@@ -3,7 +3,7 @@ WateringPublisher — the one MQTT write path: manual watering commands to P05.
 
 Reads go through P06's HTTP query API (see p06_client.py); MQTT is used ONLY to
 publish the safety-critical manual-watering command. P13 acts as a minimal
-Sparkplug B node: it registers an NDEATH as its LWT, publishes an NBIRTH on
+Sparkplug B node: it registers an NINFO last-will, publishes NINFO online on
 connect, and stamps every command with a wrapping sequence number.
 
 The command is a DCMD to P05's controller device, encoded with the shared
@@ -16,9 +16,11 @@ from the FastAPI request thread and is safe to do so.
 
 SECURITY (issue #16, per P09): the broker secures this path — MQTT over TLS +
 our per-component P13 credentials + a broker ACL that only lets P13 publish to
-the watering topic. Configured via env (MQTT_TLS*, MQTT_USERNAME/PASSWORD),
-off by default so the local/demo broker works; fill in with P09's values.
-P09's model uses no app-layer payload signing.
+the watering topic. Username/password come from P13's own auth.env (see
+scripts/setup-workspace.sh, which bootstraps it) via
+schema.mqtt.create_client(); TLS is configured via env (MQTT_TLS*), off by
+default so the local/demo broker works; fill in with P09's values. P09's
+model uses no app-layer payload signing.
 """
 
 from __future__ import annotations
@@ -27,21 +29,17 @@ import logging
 import os
 
 import paho.mqtt.client as mqtt
-import schema.p13 as p13
-from schema import codec
-from schema.core import (
-    BirthDeathCounter,
-    DataType,
-    Metric,
-    SequenceCounter,
-    SparkplugPayload,
-    death_payload,
-)
+from schema.core import SequenceCounter
 from schema.p05 import (
     ManualTriggerCommandTopic,
     ManualWateringAction,
     ManualWateringTrigger,
 )
+from schema.p13 import InfoTopic
+from schema.utils import package_root
+
+from schema import codec
+from schema import mqtt as schema_mqtt
 
 log = logging.getLogger("p13.mqtt")
 
@@ -51,22 +49,14 @@ KEEPALIVE = int(os.getenv("MQTT_KEEPALIVE", "60"))
 CLIENT_ID = os.getenv("MQTT_CLIENT_ID", "p13-app-main")
 ENABLED = os.getenv("MQTT_ENABLED", "true").lower() in ("1", "true", "yes", "on")
 PUBLISH_TIMEOUT_S = float(os.getenv("MQTT_PUBLISH_TIMEOUT_S", "5"))
-
-# Lifecycle topic resolution across schema versions. Newer cps-schema merges the
-# birth + death certificates into a single ``InfoTopic`` (NINFO); older schema
-# exposes separate ``BirthTopic`` / ``DeathTopic``. Support both via the
-# imported constants so we never hardcode the address.
-_INFO_TOPIC = getattr(p13, "InfoTopic", None)
-_BIRTH_TOPIC = getattr(p13, "BirthTopic", None) or _INFO_TOPIC
-_DEATH_TOPIC = getattr(p13, "DeathTopic", None) or _INFO_TOPIC
+AUTH_ENV = package_root(__file__) / "auth.env"
 
 # --- Broker security (issue #16, per P09) ----------------------------------
 # P09's model is broker-centric: MQTT over TLS + per-component credentials +
 # per-component ACLs (the broker enforces that only P13 may publish to the
-# watering DCMD topic). We wire our client to accept those via env, ready for
-# P09's real values; all off by default so the local/demo broker still works.
-USERNAME = os.getenv("MQTT_USERNAME") or None
-PASSWORD = os.getenv("MQTT_PASSWORD") or None
+# watering DCMD topic). Username/password come from AUTH_ENV via
+# create_client(); all off by default (no password set) so the local/demo
+# broker still works.
 USE_TLS = os.getenv("MQTT_TLS", "false").lower() in ("1", "true", "yes", "on")
 TLS_CA = os.getenv("MQTT_TLS_CA") or None  # CA cert to trust (from P09)
 TLS_CERT = os.getenv("MQTT_TLS_CERT") or None  # client cert (only if mTLS)
@@ -79,21 +69,10 @@ TLS_INSECURE = os.getenv("MQTT_TLS_INSECURE", "false").lower() in (
 )  # skip server-hostname verification — testing only
 
 
-def _build_nbirth(seq: SequenceCounter, bd_seq: BirthDeathCounter) -> SparkplugPayload:
-    """Minimal NBIRTH for a node with no domain metrics: reset seq to 0 and
-    carry the bdSeq that pairs with the NDEATH LWT."""
-    seq.reset()
-    return SparkplugPayload(
-        seq=seq.next(),
-        metrics=[Metric(name="bdSeq", datatype=DataType.INT64, value=bd_seq.current)],
-    )
-
-
 class WateringPublisher:
     def __init__(self) -> None:
         self._client: mqtt.Client | None = None
         self._seq = SequenceCounter()
-        self._bd_seq = BirthDeathCounter()
         self._connected = False
 
     @property
@@ -106,13 +85,11 @@ class WateringPublisher:
         if not ENABLED:
             log.info("MQTT publisher disabled (MQTT_ENABLED=false)")
             return
-        client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=CLIENT_ID)
+        client = schema_mqtt.create_client(
+            "p13", auth_env=AUTH_ENV, client_id=CLIENT_ID
+        )
         client.on_connect = self._on_connect
         client.on_disconnect = self._on_disconnect
-
-        # Per-component credentials (P09 distributes these).
-        if USERNAME:
-            client.username_pw_set(USERNAME, PASSWORD)
 
         # MQTT over TLS (P09's secured broker). tls_set() with ca_certs=None uses
         # the system trust store; pass P09's CA via MQTT_TLS_CA. certfile/keyfile
@@ -126,13 +103,13 @@ class WateringPublisher:
             except Exception as exc:  # noqa: BLE001 — degrade gracefully
                 log.error("MQTT TLS setup failed: %s", exc)
 
-        # Register the LWT (NDEATH) before connecting so the broker publishes it
+        # Register the LWT on NINFO before connecting so the broker publishes it
         # on an unexpected drop.
         client.will_set(
-            _DEATH_TOPIC.address,
-            codec.encode(death_payload(self._bd_seq)),
-            qos=_DEATH_TOPIC.qos,
-            retain=_DEATH_TOPIC.retain,
+            InfoTopic.address,
+            codec.encode(InfoTopic.model.will().to_data(self._seq)),
+            qos=InfoTopic.qos,
+            retain=InfoTopic.retain,
         )
         # connect_async + loop_start: non-blocking, auto-retries, so app startup
         # never blocks or crashes when the broker is down.
@@ -148,6 +125,13 @@ class WateringPublisher:
         if self._client is None:
             return
         try:
+            if self._connected:
+                self._client.publish(
+                    InfoTopic.address,
+                    codec.encode(InfoTopic.model.death().to_data(self._seq)),
+                    qos=InfoTopic.qos,
+                    retain=InfoTopic.retain,
+                )
             self._client.loop_stop()
             self._client.disconnect()
         except Exception as exc:  # noqa: BLE001
@@ -159,12 +143,12 @@ class WateringPublisher:
         if reason_code == 0:
             self._connected = True
             client.publish(
-                _BIRTH_TOPIC.address,
-                codec.encode(_build_nbirth(self._seq, self._bd_seq)),
-                qos=_BIRTH_TOPIC.qos,
-                retain=_BIRTH_TOPIC.retain,
+                InfoTopic.address,
+                codec.encode(InfoTopic.model.birth().to_data(self._seq)),
+                qos=InfoTopic.qos,
+                retain=InfoTopic.retain,
             )
-            log.info("MQTT connected to %s:%s; NBIRTH published", BROKER, PORT)
+            log.info("MQTT connected to %s:%s; NINFO birth published", BROKER, PORT)
         else:
             self._connected = False
             log.warning("MQTT connection refused: %s", reason_code)

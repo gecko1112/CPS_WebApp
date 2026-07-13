@@ -26,6 +26,7 @@ from .auth import (
     require_operator,
 )
 from .email_util import EMAIL_ENABLED, send_email
+from .mock_data import MockSensorService
 from .models import User
 from .schemas import UserCreate, UserRead, UserUpdate
 
@@ -185,6 +186,7 @@ async def trigger_water(req: WaterRequest, user: User = Depends(require_operator
         )
     duration = req.duration_s if req.action == "start" else None
     if watering_publisher is None:  # demo / mock mode — no broker
+        assert isinstance(sensor_service, MockSensorService)
         result = sensor_service.trigger_watering(req.action, duration)
     else:
         try:

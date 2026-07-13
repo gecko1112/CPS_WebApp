@@ -1,4 +1,5 @@
 """SQLAlchemy ORM models (fastapi-users compatible)."""
+
 from __future__ import annotations
 
 from enum import StrEnum
