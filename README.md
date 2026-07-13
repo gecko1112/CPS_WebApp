@@ -26,7 +26,7 @@ other groups → MQTT broker → P06 logger (InfluxDB + HTTP query API)
   - Alert panel + in-app toasts + best-effort browser notifications
   - Editable plant watering profiles (operator), watering history (advanced view)
 - **`backend/`** — FastAPI + **fastapi-users** (JWT auth, roles viewer/operator/admin, SQLite) + **fastapi-mail** (email on manual watering and on critical anomaly alerts, with per-component cooldown; demo via Mailpit) + **httpx** (P06 client) + **paho-mqtt** (watering publisher, TLS/credentials-ready for P09).
-- **`scripts/export-to-monorepo.sh`** — one-command pipeline into the course monorepo (builds frontend, syncs backend, commits on the guarded `p13/initial-integration` branch; `--push` updates the MR). This repo is the single source of truth.
+- **`scripts/export-to-monorepo.sh`** — one-command source sync into the course monorepo: cuts `p13/sync` fresh from the monorepo's `origin/main` (integration team's work is always the base), rsyncs only our source areas (`backend/app/`, `frontend/src|public/` + configs), commits; `--push` for an MR. Never touches workspace-managed files (`backend/pyproject.toml`, `bun.lock`). In the monorepo, P13 runs via P10's `scripts/run.sh` (backend :8000 + vite :5173).
 
 ## Not included (by design / blocked)
 
