@@ -105,6 +105,7 @@ docker run --rm -d -p 1025:1025 -p 8025:8025 axllent/mailpit
 | GET | `/api/watering/history` | Past watering events (chart markers) |
 | GET/PATCH | `/api/config/watering` | Plant watering profiles (PATCH: operator) |
 | POST | `/api/commands/water` | Manual watering (operator + confirmation; start/stop) |
+| POST | `/api/commands/auto-watering` | Enable/disable P05 automatic watering (operator) |
 
 ## Deployment
 
