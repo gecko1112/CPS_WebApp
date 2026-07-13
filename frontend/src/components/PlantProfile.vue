@@ -3,7 +3,9 @@ import { ref, watch, computed } from 'vue'
 import { Leaf, Save } from 'lucide-vue-next'
 
 const props = defineProps({
-  // { active, profiles: {name: {target_moist, dry_days, suppress_daytime}}, editable }
+  // { active, profiles: {name: {moist_lower, moist_upper, dry_days,
+  //   suppress_daytime, suppress_rain, rain_suppress_threshold_mm}}, editable }
+  // — exact mirror of P05's central-config P05ProfileConfig.
   config: { type: Object, default: null },
   isOperator: { type: Boolean, default: false },
   advanced: { type: Boolean, default: false }, // full param table vs. dropdown
@@ -19,7 +21,7 @@ function selectActive() {
 }
 
 const active = ref(null)
-const rows = ref([]) // [{ name, target_moist, dry_days, suppress_daytime }]
+const rows = ref([]) // one row per profile, P05ProfileConfig fields
 const dirty = ref(false)
 
 // Sync from props — but never clobber an in-progress edit (polling refreshes config).
@@ -30,9 +32,12 @@ watch(
     active.value = cfg.active
     rows.value = Object.entries(cfg.profiles || {}).map(([name, d]) => ({
       name,
-      target_moist: d.target_moist,
+      moist_lower: d.moist_lower,
+      moist_upper: d.moist_upper,
       dry_days: d.dry_days,
       suppress_daytime: d.suppress_daytime,
+      suppress_rain: d.suppress_rain,
+      rain_suppress_threshold_mm: d.rain_suppress_threshold_mm,
     }))
   },
   { immediate: true },
@@ -41,10 +46,15 @@ watch(
 function save() {
   const profiles = {}
   for (const r of rows.value) {
+    const lower = Math.min(1, Math.max(0, Number(r.moist_lower)))
     profiles[r.name] = {
-      target_moist: Math.min(1, Math.max(0, Number(r.target_moist))),
+      moist_lower: lower,
+      // P05 validates upper > lower — enforce it client-side too.
+      moist_upper: Math.min(1, Math.max(lower + 0.01, Number(r.moist_upper))),
       dry_days: Math.max(0, Number(r.dry_days)),
       suppress_daytime: Boolean(r.suppress_daytime),
+      suppress_rain: Boolean(r.suppress_rain),
+      rain_suppress_threshold_mm: Math.max(0, Number(r.rain_suppress_threshold_mm)),
     }
   }
   emit('save', { active: active.value, profiles })
@@ -101,9 +111,11 @@ function save() {
           <tr class="text-left text-xs text-white/40">
             <th class="font-medium py-1 pr-2">Active</th>
             <th class="font-medium py-1 pr-3">Profile</th>
-            <th class="font-medium py-1 pr-3">Target moisture</th>
+            <th class="font-medium py-1 pr-3">Moisture min</th>
+            <th class="font-medium py-1 pr-3">Moisture max</th>
             <th class="font-medium py-1 pr-3">Dry days</th>
-            <th class="font-medium py-1">Night-only</th>
+            <th class="font-medium py-1 pr-3">Night-only</th>
+            <th class="font-medium py-1">Skip rain ≥ mm</th>
           </tr>
         </thead>
         <tbody>
@@ -125,19 +137,33 @@ function save() {
             </td>
             <td class="py-2 pr-3 capitalize text-white/80 font-medium">{{ r.name }}</td>
             <td class="py-2 pr-3">
-              <template v-if="editable">
-                <input
-                  type="number"
-                  step="0.05"
-                  min="0"
-                  max="1"
-                  v-model.number="r.target_moist"
-                  @input="dirty = true"
-                  class="w-16 bg-white/5 rounded px-1.5 py-0.5 text-white/90 border border-white/10 focus:border-plant-500 outline-none"
-                />
-              </template>
+              <input
+                v-if="editable"
+                type="number"
+                step="0.05"
+                min="0"
+                max="1"
+                v-model.number="r.moist_lower"
+                @input="dirty = true"
+                class="w-16 bg-white/5 rounded px-1.5 py-0.5 text-white/90 border border-white/10 focus:border-plant-500 outline-none"
+              />
               <span v-else class="text-white/70">
-                {{ (r.target_moist * 100).toFixed(0) }}%
+                {{ (r.moist_lower * 100).toFixed(0) }}%
+              </span>
+            </td>
+            <td class="py-2 pr-3">
+              <input
+                v-if="editable"
+                type="number"
+                step="0.05"
+                min="0"
+                max="1"
+                v-model.number="r.moist_upper"
+                @input="dirty = true"
+                class="w-16 bg-white/5 rounded px-1.5 py-0.5 text-white/90 border border-white/10 focus:border-plant-500 outline-none"
+              />
+              <span v-else class="text-white/70">
+                {{ (r.moist_upper * 100).toFixed(0) }}%
               </span>
             </td>
             <td class="py-2 pr-3">
@@ -151,7 +177,7 @@ function save() {
               />
               <span v-else class="text-white/70">{{ r.dry_days }}</span>
             </td>
-            <td class="py-2">
+            <td class="py-2 pr-3">
               <input
                 type="checkbox"
                 v-model="r.suppress_daytime"
@@ -159,6 +185,30 @@ function save() {
                 @change="dirty = true"
                 class="accent-plant-500"
               />
+            </td>
+            <td class="py-2">
+              <div class="flex items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  v-model="r.suppress_rain"
+                  :disabled="!editable"
+                  @change="dirty = true"
+                  class="accent-plant-500"
+                />
+                <input
+                  v-if="editable"
+                  type="number"
+                  min="0"
+                  step="1"
+                  v-model.number="r.rain_suppress_threshold_mm"
+                  @input="dirty = true"
+                  :disabled="!r.suppress_rain"
+                  class="w-14 bg-white/5 rounded px-1.5 py-0.5 text-white/90 border border-white/10 focus:border-plant-500 outline-none disabled:opacity-40"
+                />
+                <span v-else-if="r.suppress_rain" class="text-white/70">
+                  {{ r.rain_suppress_threshold_mm }}
+                </span>
+              </div>
             </td>
           </tr>
         </tbody>

@@ -87,6 +87,21 @@ async function saveProfile(payload) {
   }
 }
 
+// Auto-watering command state is optimistic: P05 doesn't publish the current
+// enabled flag, so we show the last command we sent (null until first use).
+const autoWatering = ref(null)
+async function setAutoWatering(enabled) {
+  error.value = ''
+  try {
+    await api.autoWatering(enabled)
+    autoWatering.value = enabled
+    success.value = `Automatic watering turned ${enabled ? 'on' : 'off'}.`
+    setTimeout(() => { success.value = '' }, 4000)
+  } catch (e) {
+    error.value = e.message
+  }
+}
+
 async function confirmWater() {
   watering.value = true
   error.value = ''
@@ -128,7 +143,8 @@ function fmtHours(h) {
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-950 relative overflow-hidden">
+  <!-- Very light green hue behind the water-droplet backdrop -->
+  <div class="min-h-screen bg-[#0a1710] relative overflow-hidden">
     <!-- Greyish / translucent water-droplet backdrop -->
     <WaterBackground />
 
@@ -219,24 +235,50 @@ function fmtHours(h) {
           </div>
 
           <div
-            class="glass rounded-2xl p-4 sm:p-5 flex items-center justify-between gap-3"
+            class="glass rounded-2xl p-4 sm:p-5 space-y-3"
             :class="!isAdvanced ? 'sm:col-span-2' : ''"
           >
-            <div>
-              <p class="font-semibold text-white">Manual watering</p>
-              <p class="text-sm text-white/50">
-                {{ isOperator ? 'Trigger a watering cycle now.' : 'Operator role required.' }}
-              </p>
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <p class="font-semibold text-white">Manual watering</p>
+                <p class="text-sm text-white/50">
+                  {{ isOperator ? 'Trigger a watering cycle now.' : 'Operator role required.' }}
+                </p>
+              </div>
+              <Button
+                label="Water now"
+                :disabled="!isOperator"
+                @click="showConfirm = true"
+                class="!bg-plant-600 !border-plant-600 hover:!bg-plant-500 !rounded-xl shrink-0"
+              >
+                <Droplet class="w-4 h-4 mr-2" />
+                Water now
+              </Button>
             </div>
-            <Button
-              label="Water now"
-              :disabled="!isOperator"
-              @click="showConfirm = true"
-              class="!bg-plant-600 !border-plant-600 hover:!bg-plant-500 !rounded-xl shrink-0"
-            >
-              <Droplet class="w-4 h-4 mr-2" />
-              Water now
-            </Button>
+            <!-- Auto-watering on/off — P05's AutoWateringCommand over MQTT -->
+            <div class="flex items-center justify-between gap-3 pt-3 border-t border-white/10">
+              <p class="text-sm text-white/50">
+                Automatic watering
+                <span v-if="isAdvanced" class="text-white/30">(command to controller)</span>
+              </p>
+              <div class="flex items-center rounded-lg bg-white/10 p-0.5 text-xs font-medium">
+                <button
+                  v-for="opt in [{ v: true, l: 'On' }, { v: false, l: 'Off' }]"
+                  :key="opt.l"
+                  type="button"
+                  :disabled="!isOperator"
+                  @click="setAutoWatering(opt.v)"
+                  :class="[
+                    'px-3 py-1 rounded-md transition-colors disabled:opacity-40',
+                    autoWatering === opt.v
+                      ? 'bg-plant-600 text-white'
+                      : 'text-white/50 hover:text-white',
+                  ]"
+                >
+                  {{ opt.l }}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 

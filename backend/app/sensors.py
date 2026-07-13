@@ -435,7 +435,17 @@ class P06SensorService:
             else:
                 last = latest_ts.get(cid)
                 online = is_fresh(last, COMPONENT_FRESH_WINDOW_S)
-            out.append({"id": cid, "label": label, "online": online, "last_seen": last})
+            out.append(
+                {
+                    "id": cid,
+                    "label": label,
+                    "online": online,
+                    "last_seen": last,
+                    # P07 publishes its own data quality (live/cached/
+                    # unavailable); surface it instead of a bare online dot.
+                    "status": self.weather.get("status") if cid == "p07" else None,
+                }
+            )
         return out
 
     # -- watering history + plant profile (real mode: honest stubs) ---------
@@ -446,30 +456,51 @@ class P06SensorService:
         return []
 
     def get_watering_config(self) -> dict:
-        # Profile definitions mirror P05's profiles/*.json. We can't read the
-        # *active* profile or change it until P05 exposes/accepts that (issue:
-        # P05 integration), so editing is disabled in real mode.
+        # EXACT mirror of P05's central-config ``P05ProfileConfig``
+        # (cps_config.p05 defaults): moist_lower/upper are the bang-bang
+        # regulator's soil-moisture bounds. P05 picks its profile at STARTUP
+        # via the P05_PROFILE env var — over MQTT it accepts only
+        # ManualWateringTrigger and AutoWateringCommand, so there is no
+        # runtime profile editing; read-only is the honest state here.
         return {
             "active": None,
             "profiles": {
-                "tomato": {
-                    "target_moist": 0.45,
-                    "dry_days": 2,
-                    "suppress_daytime": True,
+                "base": {
+                    "moist_lower": 0.6,
+                    "moist_upper": 0.7,
+                    "dry_days": 0,
+                    "suppress_daytime": False,
+                    "suppress_rain": True,
+                    "rain_suppress_threshold_mm": 2.0,
                 },
                 "cactus": {
-                    "target_moist": 0.15,
-                    "dry_days": 10,
+                    "moist_lower": 0.1,
+                    "moist_upper": 0.2,
+                    "dry_days": 14,
                     "suppress_daytime": False,
+                    "suppress_rain": False,
+                    "rain_suppress_threshold_mm": 0.0,
                 },
                 "herbs": {
-                    "target_moist": 0.55,
-                    "dry_days": 1,
+                    "moist_lower": 0.4,
+                    "moist_upper": 0.55,
+                    "dry_days": 0,
+                    "suppress_daytime": False,
+                    "suppress_rain": True,
+                    "rain_suppress_threshold_mm": 20.0,
+                },
+                "tomato": {
+                    "moist_lower": 0.35,
+                    "moist_upper": 0.5,
+                    "dry_days": 0,
                     "suppress_daytime": True,
+                    "suppress_rain": True,
+                    "rain_suppress_threshold_mm": 10.0,
                 },
             },
             "editable": False,
-            "note": "Plant profile control requires P05 integration (not wired yet).",
+            "note": "P05 selects its profile at startup (P05_PROFILE, central "
+            "config); no runtime profile command exists yet.",
         }
 
     def update_watering_config(

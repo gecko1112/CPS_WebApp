@@ -215,6 +215,30 @@ async def trigger_water(req: WaterRequest, user: User = Depends(require_operator
     }
 
 
+class AutoWateringRequest(BaseModel):
+    enabled: bool
+
+
+@app.post("/api/commands/auto-watering")
+async def set_auto_watering(
+    req: AutoWateringRequest, user: User = Depends(require_operator)
+):
+    """Enable/disable P05's automatic watering (schema.p05.AutoWateringCommand —
+    one of exactly two commands P05 accepts from us over MQTT)."""
+    if watering_publisher is None:  # demo / mock mode — no broker
+        assert isinstance(sensor_service, MockSensorService)
+        result = sensor_service.set_auto_watering(req.enabled)
+    else:
+        try:
+            result = watering_publisher.publish_auto_watering(req.enabled)
+        except RuntimeError as exc:
+            raise HTTPException(
+                status_code=503,
+                detail=f"Auto-watering command could not be sent: {exc}",
+            ) from exc
+    return {"ok": True, "enabled": req.enabled, "set_by": user.email, **result}
+
+
 # ---------------------------------------------------------------------------
 # Watering history + plant profile (questionnaire-driven: watering history was
 # the #1 advanced-view ask; plant profiles came from P05).

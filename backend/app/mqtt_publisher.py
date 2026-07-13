@@ -31,6 +31,8 @@ import os
 import paho.mqtt.client as mqtt
 from schema.core import SequenceCounter
 from schema.p05 import (
+    AutoWateringCommand,
+    AutoWateringCommandTopic,
     ManualTriggerCommandTopic,
     ManualWateringAction,
     ManualWateringTrigger,
@@ -191,6 +193,27 @@ class WateringPublisher:
             seq_used,
         )
         return {"topic": ManualTriggerCommandTopic.address, "seq": seq_used}
+
+    def publish_auto_watering(self, enabled: bool) -> dict:
+        """Publish P05's AutoWateringCommand (enable/disable automatic watering).
+        Same broker-level security model as the manual trigger."""
+        if self._client is None or not self._connected:
+            raise RuntimeError("not connected to the MQTT broker")
+
+        command = AutoWateringCommand(enabled=enabled)
+        seq_used = self._seq.current
+        payload = codec.encode(command.to_data(self._seq))
+        info = self._client.publish(
+            AutoWateringCommandTopic.address,
+            payload,
+            qos=AutoWateringCommandTopic.qos,
+            retain=AutoWateringCommandTopic.retain,
+        )
+        info.wait_for_publish(timeout=PUBLISH_TIMEOUT_S)
+        if not info.is_published():
+            raise RuntimeError("publish timed out — broker did not acknowledge")
+        log.info("auto-watering command published: enabled=%s seq=%s", enabled, seq_used)
+        return {"topic": AutoWateringCommandTopic.address, "seq": seq_used}
 
 
 watering_publisher = WateringPublisher()

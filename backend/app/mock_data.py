@@ -92,12 +92,45 @@ _WEATHER_SCENARIOS = [
 ]
 
 
-# Plant watering profiles (mirrors P05's profiles/*.json: target_moist 0–1,
-# dry_days = min days between waterings, suppress_daytime = water at night only).
+# Plant watering profiles — EXACT mirror of P05's central-config
+# ``P05ProfileConfig`` (cps_config.p05): moist_lower/moist_upper are the
+# bang-bang regulator's soil-moisture bounds (0–1, upper > lower), dry_days =
+# min days between waterings, suppress_daytime = water at night only,
+# suppress_rain + rain_suppress_threshold_mm = skip when rain is forecast.
+# Values match P05's shipped defaults (base/cactus/herbs/tomato).
 _PLANT_PROFILES = {
-    "tomato": {"target_moist": 0.45, "dry_days": 2, "suppress_daytime": True},
-    "cactus": {"target_moist": 0.15, "dry_days": 10, "suppress_daytime": False},
-    "herbs": {"target_moist": 0.55, "dry_days": 1, "suppress_daytime": True},
+    "base": {
+        "moist_lower": 0.6,
+        "moist_upper": 0.7,
+        "dry_days": 0,
+        "suppress_daytime": False,
+        "suppress_rain": True,
+        "rain_suppress_threshold_mm": 2.0,
+    },
+    "cactus": {
+        "moist_lower": 0.1,
+        "moist_upper": 0.2,
+        "dry_days": 14,
+        "suppress_daytime": False,
+        "suppress_rain": False,
+        "rain_suppress_threshold_mm": 0.0,
+    },
+    "herbs": {
+        "moist_lower": 0.4,
+        "moist_upper": 0.55,
+        "dry_days": 0,
+        "suppress_daytime": False,
+        "suppress_rain": True,
+        "rain_suppress_threshold_mm": 20.0,
+    },
+    "tomato": {
+        "moist_lower": 0.35,
+        "moist_upper": 0.5,
+        "dry_days": 0,
+        "suppress_daytime": True,
+        "suppress_rain": True,
+        "rain_suppress_threshold_mm": 10.0,
+    },
 }
 
 
@@ -187,6 +220,7 @@ class MockSensorService:
         # mode we keep an editable in-memory copy so the UI is fully functional.
         self.active_profile = "tomato"
         self.profiles = {name: dict(v) for name, v in _PLANT_PROFILES.items()}
+        self.auto_watering = True
         now = datetime.now(tz=UTC)
         self.watering_events: deque[dict] = deque(
             [
@@ -267,7 +301,9 @@ class MockSensorService:
                         "precipitation_mm": round(precip, 1),
                         "solar_radiation_wm2": round(solar, 0),
                         "confidence": round(random.uniform(0.6, 0.95), 2),
-                        "status": "live",
+                        # P07's own data-quality field; mostly live, sometimes
+                        # cached so the advanced view visibly changes.
+                        "status": random.choice(["live", "live", "live", "cached"]),
                         "timestamp": now,
                     }
                 )
@@ -368,6 +404,15 @@ class MockSensorService:
             )
         return {"topic": "mock://p05/manual_trigger", "seq": self._tick}
 
+    def set_auto_watering(self, enabled: bool) -> dict:
+        # Demo counterpart of publishing schema.p05.AutoWateringCommand.
+        self.auto_watering = enabled
+        if not enabled and self.controller["state"] == "watering":
+            self.controller.update(
+                {"state": "idle", "reason": "auto_disabled", "timestamp": _now()}
+            )
+        return {"topic": "mock://p05/auto_watering", "seq": self._tick}
+
     # -- watering history + plant profile -----------------------------------
 
     def get_component_health(self) -> list[dict]:
@@ -378,6 +423,9 @@ class MockSensorService:
                 "label": label,
                 "online": cid != self._offline_component,
                 "last_seen": None if cid == self._offline_component else now,
+                # P07 publishes its own data quality (live/cached/unavailable);
+                # surface it instead of a bare online/offline dot.
+                "status": self.weather["status"] if cid == "p07" else None,
             }
             for cid, label in COMPONENTS
         ]

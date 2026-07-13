@@ -106,6 +106,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ confirm: true, action, duration_s: durationS }),
     }),
+  autoWatering: (enabled) =>
+    request('/api/commands/auto-watering', {
+      method: 'POST',
+      body: JSON.stringify({ enabled }),
+    }),
   wateringHistory: (limit = 20) =>
     request(`/api/watering/history?limit=${limit}`),
   notifyTest: () => request('/api/notify/test', { method: 'POST' }),

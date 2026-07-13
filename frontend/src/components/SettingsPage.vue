@@ -4,6 +4,7 @@ import Button from 'primevue/button'
 import { Save, Bell, Mail } from 'lucide-vue-next'
 
 import AppHeader from './AppHeader.vue'
+import WaterBackground from './WaterBackground.vue'
 import { api } from '../composables/useApi'
 import {
   notificationsSupported,
@@ -61,12 +62,9 @@ const notifStatus = computed(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-plant-950 relative overflow-hidden">
-    <!-- Background blobs -->
-    <div class="fixed inset-0 overflow-hidden pointer-events-none">
-      <div class="blob w-[400px] h-[400px] bg-plant-800/30 -top-20 -right-20" style="animation-delay: -5s" />
-      <div class="blob w-[300px] h-[300px] bg-plant-600/20 bottom-10 -left-20" style="animation-delay: -15s" />
-    </div>
+  <!-- Very light green hue + the water-droplet backdrop (same as Dashboard) -->
+  <div class="min-h-screen bg-[#0a1710] relative overflow-hidden">
+    <WaterBackground />
 
     <div class="relative z-10">
       <AppHeader transparent />

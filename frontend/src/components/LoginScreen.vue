@@ -5,24 +5,38 @@ import InputText from 'primevue/inputtext'
 import Password from 'primevue/password'
 import Message from 'primevue/message'
 import { Sprout } from 'lucide-vue-next'
-import { login } from '../composables/useApi'
+import { login, register } from '../composables/useApi'
 import router from '../router'
 
 const email = ref('')
 const password = ref('')
 const error = ref('')
 const loading = ref(false)
+const mode = ref('login') // 'login' | 'register'
+
+function switchMode() {
+  mode.value = mode.value === 'login' ? 'register' : 'login'
+  error.value = ''
+}
 
 async function submit() {
   error.value = ''
   loading.value = true
   try {
+    if (mode.value === 'register') {
+      // Self-service signup — new accounts are always read-only viewers;
+      // promotion to operator is an explicit admin action.
+      await register(email.value, password.value)
+    }
     await login(email.value, password.value)
     const stored = localStorage.getItem('plantcps_landing')
     const preferred = stored && stored !== 'welcome' ? stored : 'dashboard'
     router.push({ name: preferred })
   } catch (e) {
-    error.value = 'Login failed. Check email and password.'
+    error.value =
+      mode.value === 'register'
+        ? 'Registration failed — the email may already be in use.'
+        : 'Login failed. Check email and password.'
   } finally {
     loading.value = false
   }
@@ -55,7 +69,9 @@ async function submit() {
         </div>
         <div>
           <h1 class="text-xl font-bold text-white">Plant CPS</h1>
-          <p class="text-sm text-white/50">Sign in to view your plants</p>
+          <p class="text-sm text-white/50">
+            {{ mode === 'login' ? 'Sign in to view your plants' : 'Create your account' }}
+          </p>
         </div>
       </div>
 
@@ -80,17 +96,28 @@ async function submit() {
 
         <Button
           type="submit"
-          label="Sign in"
+          :label="mode === 'login' ? 'Sign in' : 'Create account'"
           :loading="loading"
           class="w-full !bg-plant-600 !border-plant-600 hover:!bg-plant-500 !rounded-xl"
         />
       </form>
 
-      <div class="mt-6 pt-4 border-t border-white/10 text-xs text-white/40">
-        <p class="font-semibold mb-1 text-white/60">Test accounts:</p>
-        <p>viewer@example.com / viewer123 — read only</p>
-        <p>operator@example.com / operator123 — can water</p>
-        <p>admin@example.com / admin123 — full access</p>
+      <div class="mt-6 pt-4 border-t border-white/10 text-sm text-center">
+        <button
+          type="button"
+          @click="switchMode"
+          class="text-plant-300 hover:text-plant-200 transition-colors"
+        >
+          {{
+            mode === 'login'
+              ? 'No account yet? Create one'
+              : 'Already have an account? Sign in'
+          }}
+        </button>
+        <p v-if="mode === 'register'" class="text-xs text-white/40 mt-2">
+          New accounts can view the dashboard. Watering control requires an
+          operator role granted by an admin.
+        </p>
       </div>
     </div>
   </div>

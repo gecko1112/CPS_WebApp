@@ -2,23 +2,36 @@
 import { Activity } from 'lucide-vue-next'
 
 defineProps({
-  // [{ id, label, online: true|false|null, last_seen }]
+  // [{ id, label, online: true|false|null, last_seen, status }] — status is a
+  // component-published data-quality string (e.g. P07: live/cached/unavailable)
+  // shown instead of the generic online/offline text when present.
   components: { type: Array, default: () => [] },
 })
 
-function dotClass(online) {
-  if (online === true) return 'bg-emerald-400'
-  if (online === false) return 'bg-rose-500'
+function dotClass(c) {
+  if (c.status) {
+    if (c.status === 'live') return 'bg-emerald-400'
+    if (c.status === 'unavailable') return 'bg-rose-500'
+    return 'bg-amber-400' // cached & friends: usable but not fresh
+  }
+  if (c.online === true) return 'bg-emerald-400'
+  if (c.online === false) return 'bg-rose-500'
   return 'bg-amber-400' // null = unknown
 }
-function stateText(online) {
-  if (online === true) return 'online'
-  if (online === false) return 'offline'
+function stateText(c) {
+  if (c.status) return c.status
+  if (c.online === true) return 'online'
+  if (c.online === false) return 'offline'
   return 'unknown'
 }
-function stateClass(online) {
-  if (online === true) return 'text-emerald-400'
-  if (online === false) return 'text-rose-400'
+function stateClass(c) {
+  if (c.status) {
+    if (c.status === 'live') return 'text-emerald-400'
+    if (c.status === 'unavailable') return 'text-rose-400'
+    return 'text-amber-400'
+  }
+  if (c.online === true) return 'text-emerald-400'
+  if (c.online === false) return 'text-rose-400'
   return 'text-amber-400'
 }
 </script>
@@ -35,7 +48,7 @@ function stateClass(online) {
         :key="c.id"
         class="flex items-center gap-2 rounded-lg bg-white/5 px-3 py-1.5"
       >
-        <span class="w-2 h-2 rounded-full shrink-0" :class="dotClass(c.online)" />
+        <span class="w-2 h-2 rounded-full shrink-0" :class="dotClass(c)" />
         <span
           class="text-sm"
           :class="c.online === false ? 'text-white/40' : 'text-white/75'"
@@ -44,9 +57,9 @@ function stateClass(online) {
         </span>
         <span
           class="text-[10px] uppercase tracking-wide"
-          :class="stateClass(c.online)"
+          :class="stateClass(c)"
         >
-          {{ stateText(c.online) }}
+          {{ stateText(c) }}
         </span>
       </div>
     </div>
