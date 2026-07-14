@@ -23,7 +23,7 @@ async function sendTestEmail() {
   emailSending.value = true
   try {
     await api.notifyTest()
-    emailMsg.value = 'Test email sent — check Mailpit at localhost:8025.'
+    emailMsg.value = 'Test email sent - check Mailpit at localhost:8025.'
   } catch (e) {
     emailErr.value = e.message
   } finally {
@@ -49,13 +49,13 @@ const notifStatus = computed(() => {
     return { kind: 'unsupported', text: 'Not supported by this browser. On iPhone, add the app to your home screen first.' }
   }
   if (!secure) {
-    return { kind: 'insecure', text: 'Needs HTTPS — unavailable over plain http on the local network.' }
+    return { kind: 'insecure', text: 'Needs HTTPS - unavailable over plain http on the local network.' }
   }
   if (notificationPermission.value === 'granted') {
     return { kind: 'granted', text: 'Enabled on this device.' }
   }
   if (notificationPermission.value === 'denied') {
-    return { kind: 'denied', text: 'Blocked — allow notifications for this site in your browser settings.' }
+    return { kind: 'denied', text: 'Blocked - allow notifications for this site in your browser settings.' }
   }
   return { kind: 'default', text: 'Also get a device notification when the tab is in the background.' }
 })
@@ -72,7 +72,7 @@ const notifStatus = computed(() => {
       <main class="max-w-2xl mx-auto p-4 sm:p-8 space-y-6">
         <h2 class="text-2xl font-bold text-white">Settings</h2>
 
-        <!-- Landing page preference — parked while the welcome page is removed
+        <!-- Landing page preference - parked while the welcome page is removed
              from the flow (only one destination left). Re-enable by changing
              v-if to true when the welcome page returns. -->
         <div v-if="false" class="glass rounded-2xl p-5 sm:p-6 space-y-4">
@@ -164,7 +164,7 @@ const notifStatus = computed(() => {
           </div>
         </div>
 
-        <!-- Email notifications (stretch goal — demo via Mailpit mock SMTP) -->
+        <!-- Email notifications (stretch goal - demo via Mailpit mock SMTP) -->
         <div class="glass rounded-2xl p-5 sm:p-6 space-y-4">
           <div class="flex items-center gap-2">
             <Mail class="w-4 h-4 text-plant-400" />

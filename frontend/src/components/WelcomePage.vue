@@ -78,10 +78,10 @@ function statusColor(level) {
   return 'text-amber-400'
 }
 function pct(v) {
-  return v == null ? '—' : (v * 100).toFixed(0)
+  return v == null ? '-' : (v * 100).toFixed(0)
 }
 function fmt(v) {
-  return v == null ? '—' : v.toFixed(1)
+  return v == null ? '-' : v.toFixed(1)
 }
 </script>
 
@@ -123,7 +123,7 @@ function fmt(v) {
           <span class="text-plant-400">taken care of.</span>
         </h1>
         <p class="text-lg text-white/50 max-w-lg mx-auto">
-          Monitor soil moisture, weather forecasts, and system health — all from your phone.
+          Monitor soil moisture, weather forecasts, and system health - all from your phone.
         </p>
       </div>
 
@@ -143,7 +143,7 @@ function fmt(v) {
         <div class="glass rounded-2xl p-4 sm:p-5">
           <p class="text-xs text-white/40 uppercase tracking-wide mb-2">Soil moisture</p>
           <p class="text-3xl font-bold text-white">
-            {{ latest ? pct(latest.soil_moisture.calibrated) : '—' }}
+            {{ latest ? pct(latest.soil_moisture.calibrated) : '-' }}
             <span class="text-base font-normal text-white/40">%</span>
           </p>
         </div>
@@ -177,14 +177,14 @@ function fmt(v) {
         <div class="glass rounded-2xl p-4">
           <p class="text-xs text-white/40 uppercase tracking-wide mb-1">Tank</p>
           <p class="text-xl font-bold text-white">
-            {{ latest ? fmt(latest.tank.level_pct) : '—' }}
+            {{ latest ? fmt(latest.tank.level_pct) : '-' }}
             <span class="text-sm font-normal text-white/40">%</span>
           </p>
         </div>
         <div class="glass rounded-2xl p-4">
           <p class="text-xs text-white/40 uppercase tracking-wide mb-1">Battery</p>
           <p class="text-xl font-bold text-white">
-            {{ latest ? fmt(latest.power.battery_soc) : '—' }}
+            {{ latest ? fmt(latest.power.battery_soc) : '-' }}
             <span class="text-sm font-normal text-white/40">%</span>
           </p>
         </div>

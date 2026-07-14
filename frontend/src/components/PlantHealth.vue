@@ -33,8 +33,8 @@ const healthy = computed(() => props.health === 'healthy')
       </p>
       <p class="text-sm text-white/50 mt-0.5">
         {{ healthy
-          ? 'Your plant is doing great — no action needed.'
-          : 'Something needs a look — check the alerts below.' }}
+          ? 'Your plant is doing great - no action needed.'
+          : 'Something needs a look - check the alerts below.' }}
       </p>
     </div>
   </div>

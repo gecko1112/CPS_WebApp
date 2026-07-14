@@ -4,7 +4,7 @@ P06 query-API client + row-grouping helpers.
 P13 reads ALL dashboard data from P06 (Data Logging & Visualisation), which
 subscribes to the whole ``spBv1.0/#`` bus, decodes Sparkplug B, and stores
 everything in InfluxDB. P06 exposes a read-only HTTP query API so we never
-touch MQTT or Sparkplug for reads. (The one write path — manual watering — is
+touch MQTT or Sparkplug for reads. (The one write path - manual watering - is
 separate and publishes to P05 over MQTT.)
 
 P06 query API (default ``http://localhost:8088``):
@@ -39,7 +39,7 @@ P06_TIMEOUT_S = float(os.getenv("P06_TIMEOUT_S", "5"))
 
 
 # ---------------------------------------------------------------------------
-# Pure helpers (no I/O — unit-testable on sample rows)
+# Pure helpers (no I/O - unit-testable on sample rows)
 # ---------------------------------------------------------------------------
 
 
@@ -82,7 +82,7 @@ def metric_series(
 ) -> list[dict[str, Any]]:
     """Time-ordered ``[{"t": <rfc3339>, "v": <value>}]`` for one measurement.
 
-    ``field`` selects one field per point — needed for P06's materialized
+    ``field`` selects one field per point - needed for P06's materialized
     aggregates (measurement ``<name>_5m``), where each point carries
     mean/min/max/count fields; pass ``field="mean"`` to avoid mixing them.
     """
@@ -127,7 +127,7 @@ def group_events(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 class P06Client:
     """Thin async wrapper over the P06 query API. Never raises on request
-    failure — returns empty results and logs, so the dashboard degrades
+    failure - returns empty results and logs, so the dashboard degrades
     gracefully when P06 is down."""
 
     def __init__(
@@ -144,7 +144,7 @@ class P06Client:
             resp = await self._client.get("/health")
             resp.raise_for_status()
             return bool(resp.json().get("ok"))
-        except Exception as exc:  # noqa: BLE001 — degrade gracefully
+        except Exception as exc:  # noqa: BLE001 - degrade gracefully
             log.warning("P06 /health failed: %s", exc)
             return False
 
@@ -152,7 +152,7 @@ class P06Client:
         """Rows for a topic over a relative window (e.g. '-15m'). For 'latest'.
 
         Implemented via /query (absolute from/to): P06's /data alias builds
-        ``range(stop: now)`` — a Flux type error (bare ``now`` is a function),
+        ``range(stop: now)`` - a Flux type error (bare ``now`` is a function),
         so every /data call 500s. /query interpolates parsed RFC3339 times and
         works. Reported to P06; revisit if they fix /data.
         """

@@ -47,13 +47,13 @@ def notify_critical_alerts(alerts: list[dict]) -> int:
         if last is not None and now - last < ALERT_EMAIL_COOLDOWN_MIN * 60:
             continue
         _last_sent[component] = now
-        subject = f"🚨 Plant CPS — critical alert: {component}"
+        subject = f"🚨 Plant CPS - critical alert: {component}"
         body = (
             f"A critical alert is active on your plant watering system.\n\n"
             f"Component:   {component}\n"
             f"Type:        {alert.get('alert_type', 'unknown')}\n"
-            f"Observed:    {alert.get('observed_value', '—')}\n"
-            f"When:        {alert.get('timestamp', '—')}\n\n"
+            f"Observed:    {alert.get('observed_value', '-')}\n"
+            f"When:        {alert.get('timestamp', '-')}\n\n"
             f"{alert.get('description', '')}\n\n"
             f"Open the dashboard for details and recent history."
         )

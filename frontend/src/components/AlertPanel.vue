@@ -53,7 +53,7 @@ function fmtTime(iso) {
     <h3 class="text-sm font-semibold text-white/60 mb-3">Active Alerts</h3>
 
     <div v-if="alerts.length === 0" class="text-sm text-white/30 py-6 text-center">
-      No active alerts — system looks healthy
+      No active alerts - system looks healthy
     </div>
 
     <div v-else class="space-y-2">

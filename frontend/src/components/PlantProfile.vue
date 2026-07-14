@@ -5,7 +5,7 @@ import { Leaf, Save } from 'lucide-vue-next'
 const props = defineProps({
   // { active, profiles: {name: {moist_lower, moist_upper, dry_days,
   //   suppress_daytime, suppress_rain, rain_suppress_threshold_mm}}, editable }
-  // — exact mirror of P05's central-config P05ProfileConfig.
+  // - exact mirror of P05's central-config P05ProfileConfig.
   config: { type: Object, default: null },
   isOperator: { type: Boolean, default: false },
   advanced: { type: Boolean, default: false }, // full param table vs. dropdown
@@ -24,7 +24,7 @@ const active = ref(null)
 const rows = ref([]) // one row per profile, P05ProfileConfig fields
 const dirty = ref(false)
 
-// Sync from props — but never clobber an in-progress edit (polling refreshes config).
+// Sync from props - but never clobber an in-progress edit (polling refreshes config).
 watch(
   () => props.config,
   (cfg) => {
@@ -49,7 +49,7 @@ function save() {
     const lower = Math.min(1, Math.max(0, Number(r.moist_lower)))
     profiles[r.name] = {
       moist_lower: lower,
-      // P05 validates upper > lower — enforce it client-side too.
+      // P05 validates upper > lower - enforce it client-side too.
       moist_upper: Math.min(1, Math.max(lower + 0.01, Number(r.moist_upper))),
       dry_days: Math.max(0, Number(r.dry_days)),
       suppress_daytime: Boolean(r.suppress_daytime),

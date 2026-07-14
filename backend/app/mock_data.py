@@ -1,5 +1,5 @@
 """
-MockSensorService — self-contained demo data source.
+MockSensorService - self-contained demo data source.
 
 Enabled with ``MOCK_DATA=true``. It mirrors the public interface of
 ``P06SensorService`` (get_latest / get_history / system_status / active_alerts /
@@ -8,7 +8,7 @@ but generates plausible moving data and rotating anomaly alerts instead of
 reading from P06.
 
 Deliberately has NO dependency on ``cps-schema``, MQTT, P06, or any other group,
-so the dashboard can be live-demoed standalone — even when the real data sources
+so the dashboard can be live-demoed standalone - even when the real data sources
 are down or the shared schema is broken. The JSON shapes are identical to the
 real service, so the frontend is unchanged.
 """
@@ -92,9 +92,9 @@ _WEATHER_SCENARIOS = [
 ]
 
 
-# Plant watering profiles — EXACT mirror of P05's central-config
+# Plant watering profiles - EXACT mirror of P05's central-config
 # ``P05ProfileConfig`` (cps_config.p05): moist_lower/moist_upper are the
-# bang-bang regulator's soil-moisture bounds (0–1, upper > lower), dry_days =
+# bang-bang regulator's soil-moisture bounds (0-1, upper > lower), dry_days =
 # min days between waterings, suppress_daytime = water at night only,
 # suppress_rain + rain_suppress_threshold_mm = skip when rain is forecast.
 # Values match P05's shipped defaults (base/cactus/herbs/tomato).
@@ -135,14 +135,14 @@ _PLANT_PROFILES = {
 
 
 # Demo alert story (P08 AnomalyAlert shape): the system starts healthy, then
-# exactly ONE warning and later ONE critical appear — no rotation, so the
+# exactly ONE warning and later ONE critical appear - no rotation, so the
 # demo (and the Mailpit inbox) never floods.
 _WARNING_ALERT = {
     "component": "p11/tank_level",
     "alert_type": "sensor_fault",
     "severity": "warning",
     "observed_value": "105.3",
-    "description": "Tank level sensor reading exceeds 100% — recalibration needed.",
+    "description": "Tank level sensor reading exceeds 100% - recalibration needed.",
 }
 
 _CRITICAL_ALERT = {
@@ -150,7 +150,7 @@ _CRITICAL_ALERT = {
     "alert_type": "process_fault",
     "severity": "critical",
     "observed_value": "no_flow",
-    "description": "The pump ran but no water arrived at the plant — the pump "
+    "description": "The pump ran but no water arrived at the plant - the pump "
     "inlet may be blocked or the tank hose disconnected.",
 }
 
@@ -491,7 +491,7 @@ class MockSensorService:
         elif tank < 10:
             level, message = "error", "Water tank almost empty"
         elif cal < 0.20:
-            level, message = "warning", "Soil is dry — watering soon"
+            level, message = "warning", "Soil is dry - watering soon"
         elif tank < 25:
             level, message = "warning", "Tank level getting low"
         elif n_alerts > 0:
@@ -508,7 +508,7 @@ class MockSensorService:
             ),
             "active_alert_count": n_alerts,
             # Plant health headline pinned to "healthy" in demo mode (P16 is
-            # vacant — placeholder per the presentation plan). The status
+            # vacant - placeholder per the presentation plan). The status
             # banner still reacts to the demo alerts; the plant itself is fine.
             "plant_health": "healthy",
             "demo_mode": True,

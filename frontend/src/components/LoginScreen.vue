@@ -24,7 +24,7 @@ async function submit() {
   loading.value = true
   try {
     if (mode.value === 'register') {
-      // Self-service signup — new accounts are always read-only viewers;
+      // Self-service signup - new accounts are always read-only viewers;
       // promotion to operator is an explicit admin action.
       await register(email.value, password.value)
     }
@@ -35,7 +35,7 @@ async function submit() {
   } catch (e) {
     error.value =
       mode.value === 'register'
-        ? 'Registration failed — the email may already be in use.'
+        ? 'Registration failed - the email may already be in use.'
         : 'Login failed. Check email and password.'
   } finally {
     loading.value = false

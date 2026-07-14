@@ -2,7 +2,7 @@
 import { Activity } from 'lucide-vue-next'
 
 defineProps({
-  // [{ id, label, online: true|false|null, last_seen, status }] — status is a
+  // [{ id, label, online: true|false|null, last_seen, status }] - status is a
   // component-published data-quality string (e.g. P07: live/cached/unavailable)
   // shown instead of the generic online/offline text when present.
   components: { type: Array, default: () => [] },

@@ -46,7 +46,7 @@ const RANGES = [
         unit="%"
         dark
         hint="Soil moisture trend over the selected window. Watch for it dropping toward the dry threshold before a watering. 💧 marks a watering event."
-        range="40–70%"
+        range="40-70%"
       />
       <HistoryChart
         title="Temperature"
@@ -55,7 +55,7 @@ const RANGES = [
         unit="°C"
         dark
         hint="Air temperature trend over the selected window."
-        range="18–26 °C"
+        range="18-26 °C"
       />
     </div>
   </div>

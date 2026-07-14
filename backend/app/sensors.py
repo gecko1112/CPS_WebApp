@@ -1,15 +1,15 @@
 """
-P06SensorService — feeds the dashboard from P06's query API.
+P06SensorService - feeds the dashboard from P06's query API.
 
 Replaces the old FakeSensorService. It polls P06 on a fixed interval and caches
 the latest reading per topic in the exact JSON shapes the REST API already
 served, so the frontend is unchanged. History is fetched from P06 on demand.
 
-Topic + metric names come from the canonical ``cps-schema`` package — never
-hardcoded — so an upstream rename breaks at import (fail fast).
+Topic + metric names come from the canonical ``cps-schema`` package - never
+hardcoded - so an upstream rename breaks at import (fail fast).
 
 The manual-watering command is a separate WRITE path (MQTT to P05) and lives in
-``mqtt_publisher.py`` — this service is read-only.
+``mqtt_publisher.py`` - this service is read-only.
 """
 
 from __future__ import annotations
@@ -42,7 +42,7 @@ ACTIVE_ALERT_WINDOW_MIN = float(os.getenv("ACTIVE_ALERT_WINDOW_MIN", "10"))
 COMPONENT_FRESH_WINDOW_S = float(os.getenv("COMPONENT_FRESH_WINDOW_S", "90"))
 
 # Sensors exposed by /api/sensors/history -> (topic, measurement, value scale).
-# Soil is scaled 0–1 -> 0–100 % to match the previous chart units.
+# Soil is scaled 0-1 -> 0-100 % to match the previous chart units.
 _HISTORY_SOURCES: dict[str, tuple[str, str, float]] = {
     "moisture": (
         p01.SoilReadingTopic.address,
@@ -187,7 +187,7 @@ class P06SensorService:
                 await self._poll_once()
             except asyncio.CancelledError:
                 raise
-            except Exception as exc:  # noqa: BLE001 — never kill the loop
+            except Exception as exc:  # noqa: BLE001 - never kill the loop
                 self._connected = False
                 log.warning("P06 poll cycle failed: %s", exc)
             await asyncio.sleep(POLL_INTERVAL_S)
@@ -355,14 +355,14 @@ class P06SensorService:
             return []
         topic, measurement, scale = source
         # P06's materialized aggregates rename the measurement (<name>_5m) and
-        # split each point into mean/min/max/count fields — select the mean.
+        # split each point into mean/min/max/count fields - select the mean.
         downsample = "1m" if hours <= 1 else "5m"
         rows = await self._client.history(topic, hours=hours, downsample=downsample)
         pts = metric_series(
             rows, f"{measurement}_{downsample}", scale=scale, field="mean"
         )
         if not pts:
-            # Aggregator not running (or no aggregates yet) — fall back to raw
+            # Aggregator not running (or no aggregates yet) - fall back to raw
             # points; our max_points step-sampling below bounds the payload.
             rows = await self._client.history(topic, hours=hours, downsample=None)
             pts = metric_series(rows, measurement, scale=scale)
@@ -381,7 +381,7 @@ class P06SensorService:
         if not self._connected:
             level, message = (
                 "warning",
-                "No data from logger (P06) — check the connection",
+                "No data from logger (P06) - check the connection",
             )
         elif ctrl == "error":
             level, message = "error", "Controller in error state"
@@ -390,7 +390,7 @@ class P06SensorService:
         elif tank is not None and tank < 10:
             level, message = "error", "Water tank almost empty"
         elif cal is not None and cal < 0.20:
-            level, message = "warning", "Soil is dry — watering soon"
+            level, message = "warning", "Soil is dry - watering soon"
         elif tank is not None and tank < 25:
             level, message = "warning", "Tank level getting low"
         elif n_alerts > 0:
@@ -459,7 +459,7 @@ class P06SensorService:
         # EXACT mirror of P05's central-config ``P05ProfileConfig``
         # (cps_config.p05 defaults): moist_lower/upper are the bang-bang
         # regulator's soil-moisture bounds. P05 picks its profile at STARTUP
-        # via the P05_PROFILE env var — over MQTT it accepts only
+        # via the P05_PROFILE env var - over MQTT it accepts only
         # ManualWateringTrigger and AutoWateringCommand, so there is no
         # runtime profile editing; read-only is the honest state here.
         return {

@@ -92,7 +92,7 @@ app.include_router(
 
 
 # ---------------------------------------------------------------------------
-# Sensors — all authenticated users
+# Sensors - all authenticated users
 # ---------------------------------------------------------------------------
 @app.get("/api/sensors/latest")
 async def latest(_: User = Depends(current_active_user)):
@@ -133,20 +133,20 @@ async def notify_test(user: User = Depends(require_operator)):
             detail="Email is disabled. Set EMAIL_ENABLED=true and run Mailpit (:1025).",
         )
     ok = await send_email(
-        "🌱 Plant CPS — test notification",
+        "🌱 Plant CPS - test notification",
         f"This is a test alert notification from the Plant CPS dashboard.\n"
         f"Requested by {user.email}.",
     )
     if not ok:
         raise HTTPException(
             status_code=502,
-            detail="Could not send the email — is Mailpit running on :1025?",
+            detail="Could not send the email - is Mailpit running on :1025?",
         )
     return {"ok": True}
 
 
 # ---------------------------------------------------------------------------
-# Alerts — matches P08 AnomalyAlert shape
+# Alerts - matches P08 AnomalyAlert shape
 # ---------------------------------------------------------------------------
 @app.get("/api/alerts/active")
 async def alerts_active(_: User = Depends(current_active_user)):
@@ -162,7 +162,7 @@ async def alerts_recent(
 
 
 # ---------------------------------------------------------------------------
-# Commands — operator only
+# Commands - operator only
 # ---------------------------------------------------------------------------
 class WaterRequest(BaseModel):
     confirm: bool = False
@@ -185,7 +185,7 @@ async def trigger_water(req: WaterRequest, user: User = Depends(require_operator
             detail="duration_s must be between 1 and 3600",
         )
     duration = req.duration_s if req.action == "start" else None
-    if watering_publisher is None:  # demo / mock mode — no broker
+    if watering_publisher is None:  # demo / mock mode - no broker
         assert isinstance(sensor_service, MockSensorService)
         result = sensor_service.trigger_watering(req.action, duration)
     else:
@@ -200,7 +200,7 @@ async def trigger_water(req: WaterRequest, user: User = Depends(require_operator
     # EMAIL_ENABLED). Never blocks or fails the command.
     asyncio.create_task(
         send_email(
-            "🌱 Plant CPS — watering triggered",
+            "🌱 Plant CPS - watering triggered",
             f"A manual watering command ({req.action}"
             + (f", {duration} s" if duration else "")
             + f") was issued by {user.email}.",
@@ -223,9 +223,9 @@ class AutoWateringRequest(BaseModel):
 async def set_auto_watering(
     req: AutoWateringRequest, user: User = Depends(require_operator)
 ):
-    """Enable/disable P05's automatic watering (schema.p05.AutoWateringCommand —
+    """Enable/disable P05's automatic watering (schema.p05.AutoWateringCommand -
     one of exactly two commands P05 accepts from us over MQTT)."""
-    if watering_publisher is None:  # demo / mock mode — no broker
+    if watering_publisher is None:  # demo / mock mode - no broker
         assert isinstance(sensor_service, MockSensorService)
         result = sensor_service.set_auto_watering(req.enabled)
     else:

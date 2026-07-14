@@ -2,7 +2,7 @@
 Email notifications (STRETCH GOAL, out of scope for the core deliverable).
 
 Sends mail via SMTP using ``fastapi-mail``. For the demo we point it at
-**Mailpit** — a mock SMTP server that catches mail and shows it in a web UI —
+**Mailpit** - a mock SMTP server that catches mail and shows it in a web UI -
 so nothing actually leaves the machine:
 
     docker run --rm -d -p 1025:1025 -p 8025:8025 axllent/mailpit
@@ -62,6 +62,6 @@ async def send_email(subject: str, body: str, to: str | None = None) -> bool:
         await FastMail(_config()).send_message(message)
         log.info("email sent: %s", subject)
         return True
-    except Exception as exc:  # noqa: BLE001 — never break the app on email failure
+    except Exception as exc:  # noqa: BLE001 - never break the app on email failure
         log.warning("email send failed: %s", exc)
         return False

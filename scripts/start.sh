@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/start.sh — start the whole P13 stack with one command.
+# scripts/start.sh - start the whole P13 stack with one command.
 #
 #   ./scripts/start.sh              # DEMO: mock data + Mailpit email demo
 #   ./scripts/start.sh --real       # REAL: broker + our backend; P06 runs elsewhere
@@ -8,18 +8,18 @@
 #   ./scripts/start.sh --no-email   # any mode without Mailpit/email
 #
 # Always starts (foreground, Ctrl+C stops everything):
-#   * backend  — uvicorn on :8000  (MOCK_DATA=true in demo mode)
-#   * frontend — Vite dev server on :5173
+#   * backend  - uvicorn on :8000  (MOCK_DATA=true in demo mode)
+#   * frontend - Vite dev server on :5173
 #   * Mailpit (docker) unless already running / --no-email
 # --real adds:  Mosquitto broker :1883 (docker, if not running)
 # --full adds:  InfluxDB :8086 (docker compose) + P06 logger/api/aggregator (uv)
 #
-# NOTE (--full): P06 logs whatever is published on the bus — actual sensor DATA
+# NOTE (--full): P06 logs whatever is published on the bus - actual sensor DATA
 # still needs the other groups' publishers (run them via mprocs in ../monorepo).
 # For the Pi/monorepo single-process deployment use mprocs there instead.
 #
 # Division of responsibility: on the Pi, P06 runs InfluxDB + logger/API
-# themselves — use --real there. --full exists so ONE person on ONE laptop can
+# themselves - use --real there. --full exists so ONE person on ONE laptop can
 # run the entire real pipeline without P06 around (we temporarily "play P06").
 
 set -euo pipefail
@@ -60,11 +60,11 @@ trap cleanup EXIT INT TERM
 
 port_up() { nc -z localhost "$1" 2>/dev/null; }
 
-# Refuse to start over a stale instance — otherwise the new backend can't bind
+# Refuse to start over a stale instance - otherwise the new backend can't bind
 # and the browser keeps talking to the OLD one (frozen alerts, old code).
 for p in 8000 5173; do
   if port_up "$p"; then
-    echo "ERROR: port $p is already in use — a previous run is still alive." >&2
+    echo "ERROR: port $p is already in use - a previous run is still alive." >&2
     echo "       Stop it first:  pkill -f 'uvicorn app.main' ; pkill -f vite" >&2
     exit 1
   fi
@@ -77,9 +77,9 @@ if $EMAIL; then
   elif command -v docker >/dev/null; then
     echo "==> Starting Mailpit ..."
     docker run --rm -d --name p13-mailpit -p 1025:1025 -p 8025:8025 axllent/mailpit >/dev/null \
-      || echo "    (couldn't start Mailpit — email demo disabled)"
+      || echo "    (couldn't start Mailpit - email demo disabled)"
   else
-    echo "==> docker not found — skipping Mailpit (email demo disabled)"
+    echo "==> docker not found - skipping Mailpit (email demo disabled)"
   fi
 fi
 
@@ -91,7 +91,7 @@ if [ "$MODE" != demo ]; then
     echo "==> Starting Mosquitto broker ..."
     docker run --rm -d --name cps-mqtt -p 1883:1883 \
       -v "$MONOREPO/docker/mosquitto.conf":/mosquitto/config/mosquitto.conf \
-      eclipse-mosquitto:2 >/dev/null || echo "    (broker start failed — watering will 503)"
+      eclipse-mosquitto:2 >/dev/null || echo "    (broker start failed - watering will 503)"
   fi
 fi
 
@@ -113,7 +113,7 @@ if [ "$MODE" = full ]; then
     elif command -v docker-compose >/dev/null; then
       (cd "$MONOREPO" && docker-compose up -d influxdb >/dev/null)
     else
-      # No compose installed — replicate the monorepo's influxdb service.
+      # No compose installed - replicate the monorepo's influxdb service.
       # Named volumes keep the data across restarts, same as compose.
       docker run -d --name cps-influxdb -p 8086:8086 \
         -e DOCKER_INFLUXDB_INIT_MODE=setup \
@@ -129,7 +129,7 @@ if [ "$MODE" = full ]; then
         || docker start cps-influxdb >/dev/null   # container exists from a previous run
     fi
   fi
-  # The port opens before Influx finishes first-run setup — wait for health.
+  # The port opens before Influx finishes first-run setup - wait for health.
   echo -n "    waiting for InfluxDB to be ready "
   until curl -fsS http://localhost:8086/health >/dev/null 2>&1; do echo -n "."; sleep 1; done
   echo " ok"

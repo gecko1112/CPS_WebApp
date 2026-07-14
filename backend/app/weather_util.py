@@ -1,5 +1,5 @@
 """
-Weather-condition derivation from P07 signals — a pure helper (no schema import,
+Weather-condition derivation from P07 signals - a pure helper (no schema import,
 so both the mock and the real service can use it).
 
 P07 publishes hourly forecasts with ``precipitation_mm`` and
@@ -10,7 +10,7 @@ shows as a sun/cloud/rain icon.
 
 from __future__ import annotations
 
-# Condition ids — the frontend maps each to an icon + label.
+# Condition ids - the frontend maps each to an icon + label.
 SUNNY = "sunny"
 PARTLY_CLOUDY = "partly_cloudy"
 CLOUDY = "cloudy"
@@ -37,7 +37,7 @@ def weather_condition(
         return RAINY
     if precipitation_mm >= 0.2:  # noqa: PLR2004
         return LIGHT_RAIN
-    # Dry — use solar radiation as a cloudiness proxy.
+    # Dry - use solar radiation as a cloudiness proxy.
     if solar_radiation_wm2 is None:
         return CLOUDY
     if solar_radiation_wm2 >= 500.0:  # noqa: PLR2004

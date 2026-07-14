@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/export-to-monorepo.sh — sync OUR SOURCE into the monorepo's P13 group
+# scripts/export-to-monorepo.sh - sync OUR SOURCE into the monorepo's P13 group
 # folder, on top of the latest main.
 #
 # ── The new monorepo world (Adrian/P10's restructure, 2026-07-09) ───────────
@@ -20,7 +20,7 @@
 # does uv sync + bun install. No frontend build, no static/ export anymore.
 #
 # ── What this script does ────────────────────────────────────────────────────
-#   1. Fetches origin and re-creates branch p13/sync FROM origin/main —
+#   1. Fetches origin and re-creates branch p13/sync FROM origin/main -
 #      so Adrian's latest work is the base and can never be overwritten.
 #   2. rsyncs ONLY our source areas (listed above) into the group folder.
 #      It never touches backend/pyproject.toml, bun.lock, or anything
@@ -29,7 +29,7 @@
 #      always freshly cut from main) for a merge request.
 #
 # The old flow (built frontend + static/ package on p13/initial-integration)
-# is dead — that branch is abandoned history, do not touch it.
+# is dead - that branch is abandoned history, do not touch it.
 #
 # Usage:
 #   ./scripts/export-to-monorepo.sh                 # sync + commit locally
@@ -62,13 +62,13 @@ done
 # --- sanity checks -----------------------------------------------------------
 [ -d "$MONOREPO" ] || { echo "ERROR: monorepo not found at '$MONOREPO'." >&2; exit 1; }
 if [ -n "$(git -C "$REPO_ROOT" status --porcelain backend frontend 2>/dev/null)" ]; then
-  echo "NOTE: backend/ or frontend/ has uncommitted changes — exporting the working tree."
+  echo "NOTE: backend/ or frontend/ has uncommitted changes - exporting the working tree."
 fi
 
 # --- 1. base the sync branch on the LATEST main ------------------------------
 if $COMMIT; then
   if [ -n "$(git -C "$MONOREPO" status --porcelain)" ]; then
-    echo "ERROR: monorepo has uncommitted changes — commit/stash them first." >&2
+    echo "ERROR: monorepo has uncommitted changes - commit/stash them first." >&2
     exit 1
   fi
   echo "==> Fetching origin and cutting $SYNC_BRANCH from origin/main ..."
@@ -78,7 +78,7 @@ fi
 
 # The layout check runs AFTER the checkout so it validates what we sync into.
 [ -d "$PKG/backend/app" ] || {
-  echo "ERROR: expected Adrian's layout ($PKG/backend/app) — monorepo too old?" >&2
+  echo "ERROR: expected Adrian's layout ($PKG/backend/app) - monorepo too old?" >&2
   exit 1
 }
 
@@ -98,7 +98,7 @@ done
 
 # Deliberately untouched: backend/pyproject.toml, frontend/bun.lock (Adrian's).
 if git -C "$MONOREPO" status --porcelain | grep -q "frontend/package.json"; then
-  echo "NOTE: package.json changed — run 'bun install' in the group frontend and"
+  echo "NOTE: package.json changed - run 'bun install' in the group frontend and"
   echo "      commit the updated bun.lock (coordinate with Adrian)."
 fi
 
@@ -112,7 +112,7 @@ fi
 git -C "$MONOREPO" add -A "src/groups/p13_web_app_non_expert_users"
 if git -C "$MONOREPO" diff --cached --quiet; then
   echo ""
-  echo "No changes to export — monorepo main already matches this repo."
+  echo "No changes to export - monorepo main already matches this repo."
   exit 0
 fi
 
@@ -122,7 +122,7 @@ echo "==> Committed on $SYNC_BRANCH (base: origin/main): $(git -C "$MONOREPO" re
 if $PUSH; then
   echo "==> Pushing $SYNC_BRANCH ..."
   git -C "$MONOREPO" push --force-with-lease origin "$SYNC_BRANCH"
-  echo "Pushed — open/refresh the MR from $SYNC_BRANCH to main (merge is P10/Adrian's call)."
+  echo "Pushed - open/refresh the MR from $SYNC_BRANCH to main (merge is P10/Adrian's call)."
 else
   echo "Not pushed. Run with --push (or: git -C \"$MONOREPO\" push --force-with-lease origin $SYNC_BRANCH)."
 fi

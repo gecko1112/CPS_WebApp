@@ -129,13 +129,13 @@ onUnmounted(() => {
 })
 
 function pct(v) {
-  return v == null ? '—' : (v * 100).toFixed(1)
+  return v == null ? '-' : (v * 100).toFixed(1)
 }
 function fmt(v) {
-  return v == null ? '—' : v.toFixed(1)
+  return v == null ? '-' : v.toFixed(1)
 }
 function fmtHours(h) {
-  if (h == null) return '—'
+  if (h == null) return '-'
   if (h < 1) return `${Math.round(h * 60)}min`
   if (h < 48) return `${h.toFixed(0)}h`
   return `${(h / 24).toFixed(1)}d`
@@ -165,26 +165,26 @@ function fmtHours(h) {
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <SensorCard
             label="Soil moisture"
-            :value="latest ? pct(latest.soil_moisture.calibrated) : '—'"
+            :value="latest ? pct(latest.soil_moisture.calibrated) : '-'"
             unit="%"
             :icon="Droplet"
             tone="emerald"
             :sub="isAdvanced && latest && latest.soil_moisture.raw_adc != null ? `raw ADC ${latest.soil_moisture.raw_adc}` : ''"
             hint="How wet the soil is right now, from the calibrated moisture sensor. 0% is bone dry, 100% is fully saturated."
-            range="40–70% for most plants"
+            range="40-70% for most plants"
           />
           <SensorCard
             label="Temperature"
-            :value="latest ? fmt(latest.weather.temperature_c) : '—'"
+            :value="latest ? fmt(latest.weather.temperature_c) : '-'"
             unit="°C"
             :icon="Thermometer"
             tone="amber"
             hint="Air temperature near the plant, from the weather service."
-            range="18–26 °C for most houseplants"
+            range="18-26 °C for most houseplants"
           />
           <SensorCard
             label="Water tank"
-            :value="latest ? fmt(latest.tank.level_pct) : '—'"
+            :value="latest ? fmt(latest.tank.level_pct) : '-'"
             unit="%"
             :icon="Container"
             tone="sky"
@@ -199,7 +199,7 @@ function fmtHours(h) {
         <div v-if="isAdvanced" class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           <SensorCard
             label="Controller"
-            :value="latest ? latest.controller.state : '—'"
+            :value="latest ? latest.controller.state : '-'"
             unit=""
             :icon="Cpu"
             tone="violet"
@@ -208,7 +208,7 @@ function fmtHours(h) {
           />
           <SensorCard
             label="Battery"
-            :value="latest ? fmt(latest.power.battery_soc) : '—'"
+            :value="latest ? fmt(latest.power.battery_soc) : '-'"
             unit="%"
             :icon="BatteryCharging"
             tone="lime"
@@ -230,7 +230,7 @@ function fmtHours(h) {
           <div v-if="isAdvanced" class="glass rounded-2xl p-4 sm:p-5">
             <p class="text-sm text-white/50 mb-1">Tank time to empty</p>
             <p class="text-2xl font-bold text-white">
-              {{ latest ? fmtHours(latest.tank_forecast.time_to_empty_h) : '—' }}
+              {{ latest ? fmtHours(latest.tank_forecast.time_to_empty_h) : '-' }}
             </p>
           </div>
 
@@ -255,7 +255,7 @@ function fmtHours(h) {
                 Water now
               </Button>
             </div>
-            <!-- Auto-watering on/off — P05's AutoWateringCommand over MQTT -->
+            <!-- Auto-watering on/off - P05's AutoWateringCommand over MQTT -->
             <div class="flex items-center justify-between gap-3 pt-3 border-t border-white/10">
               <p class="text-sm text-white/50">
                 Automatic watering

@@ -25,7 +25,7 @@ from sqlalchemy.orm import DeclarativeBase
 # Load the root .env into the process environment before anything reads env
 # vars. db.py is the first app module imported, so doing it here covers
 # auth.py and the rest of the app startup path too. Harmless no-op if the
-# process already has these vars from a sourced root .env upstream —
+# process already has these vars from a sourced root .env upstream -
 # load_dotenv doesn't override already-set vars. This also keeps standalone
 # backend runs (`cd backend && uv run uvicorn ...`, outside mprocs) working.
 _BACKEND_ROOT = package_root(__file__)

@@ -22,7 +22,7 @@ const waterY = computed(() => INNER_TOP + (INNER_H - waterHeight.value))
 const watering = computed(() =>
   ['watering', 'soaking'].includes(props.controller?.state),
 )
-const levelText = computed(() => (level.value == null ? '—' : `${Math.round(level.value)}%`))
+const levelText = computed(() => (level.value == null ? '-' : `${Math.round(level.value)}%`))
 </script>
 
 <template>

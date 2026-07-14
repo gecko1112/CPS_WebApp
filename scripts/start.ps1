@@ -1,5 +1,5 @@
-# scripts/start.ps1 — start the whole P13 stack with one command (Windows).
-# PowerShell port of scripts/start.sh — keep the two in sync.
+# scripts/start.ps1 - start the whole P13 stack with one command (Windows).
+# PowerShell port of scripts/start.sh - keep the two in sync.
 #
 #   .\scripts\start.ps1              # DEMO: mock data + Mailpit email demo
 #   .\scripts\start.ps1 -Real        # REAL: broker + our backend; P06 runs elsewhere
@@ -8,15 +8,15 @@
 #   .\scripts\start.ps1 -NoEmail     # any mode without Mailpit/email
 #
 # Always starts (Ctrl+C stops everything):
-#   * backend  — uvicorn on :8000  (MOCK_DATA=true in demo mode)
-#   * frontend — Vite dev server on :5173 (exposed on LAN for phones)
+#   * backend  - uvicorn on :8000  (MOCK_DATA=true in demo mode)
+#   * frontend - Vite dev server on :5173 (exposed on LAN for phones)
 #   * Mailpit (docker) unless already running / -NoEmail
 # -Real adds:  Mosquitto broker :1883 (docker, if not running)
 # -Full adds:  InfluxDB :8086 (docker) + P06 logger/api/aggregator (uv)
 #
-# NOTE (-Full): P06 logs whatever is published on the bus — actual sensor DATA
+# NOTE (-Full): P06 logs whatever is published on the bus - actual sensor DATA
 # still needs the other groups' publishers (run mprocs in ..\monorepo).
-# On the Pi, P06 runs its own stack — use -Real there.
+# On the Pi, P06 runs its own stack - use -Real there.
 
 param(
     [switch]$Real,
@@ -50,7 +50,7 @@ if ($Email) {
         Write-Host '==> Starting Mailpit ...'
         docker run --rm -d --name p13-mailpit -p 1025:1025 -p 8025:8025 axllent/mailpit | Out-Null
     } else {
-        Write-Host '==> docker not found — skipping Mailpit (email demo disabled)'
+        Write-Host '==> docker not found - skipping Mailpit (email demo disabled)'
     }
 }
 
@@ -95,7 +95,7 @@ if ($Mode -eq 'full') {
         if ($LASTEXITCODE -ne 0) { docker start cps-influxdb | Out-Null }
     }
 
-    # Port opens before Influx finishes first-run setup — wait for real health.
+    # Port opens before Influx finishes first-run setup - wait for real health.
     Write-Host -NoNewline '    waiting for InfluxDB to be ready '
     while ($true) {
         try {

@@ -1,5 +1,5 @@
 """
-WateringPublisher — the one MQTT write path: manual watering commands to P05.
+WateringPublisher - the one MQTT write path: manual watering commands to P05.
 
 Reads go through P06's HTTP query API (see p06_client.py); MQTT is used ONLY to
 publish the safety-critical manual-watering command. P13 acts as a minimal
@@ -7,14 +7,14 @@ Sparkplug B node: it registers an NINFO last-will, publishes NINFO online on
 connect, and stamps every command with a wrapping sequence number.
 
 The command is a DCMD to P05's controller device, encoded with the shared
-``cps-schema`` Sparkplug codec. Topic/model come from ``schema.p05`` — never
+``cps-schema`` Sparkplug codec. Topic/model come from ``schema.p05`` - never
 hardcoded.
 
 Uses paho-mqtt (the convention across the monorepo's publishers). The client
 runs its own network thread (``loop_start``); ``publish_watering`` is called
 from the FastAPI request thread and is safe to do so.
 
-SECURITY (issue #16, per P09): the broker secures this path — MQTT over TLS +
+SECURITY (issue #16, per P09): the broker secures this path - MQTT over TLS +
 our per-component P13 credentials + a broker ACL that only lets P13 publish to
 the watering topic. Username/password come from P13's own auth.env (see
 scripts/setup-workspace.sh, which bootstraps it) via
@@ -68,7 +68,7 @@ TLS_INSECURE = os.getenv("MQTT_TLS_INSECURE", "false").lower() in (
     "true",
     "yes",
     "on",
-)  # skip server-hostname verification — testing only
+)  # skip server-hostname verification - testing only
 
 
 class WateringPublisher:
@@ -102,7 +102,7 @@ class WateringPublisher:
                 if TLS_INSECURE:
                     client.tls_insecure_set(True)
                 log.info("MQTT TLS enabled (ca=%s, mtls=%s)", TLS_CA, bool(TLS_CERT))
-            except Exception as exc:  # noqa: BLE001 — degrade gracefully
+            except Exception as exc:  # noqa: BLE001 - degrade gracefully
                 log.error("MQTT TLS setup failed: %s", exc)
 
         # Register the LWT on NINFO before connecting so the broker publishes it
@@ -119,7 +119,7 @@ class WateringPublisher:
             client.connect_async(BROKER, PORT, keepalive=KEEPALIVE)
             client.loop_start()
             log.info("MQTT publisher connecting to %s:%s", BROKER, PORT)
-        except Exception as exc:  # noqa: BLE001 — degrade gracefully
+        except Exception as exc:  # noqa: BLE001 - degrade gracefully
             log.warning("MQTT connect_async failed: %s", exc)
         self._client = client
 
@@ -173,7 +173,7 @@ class WateringPublisher:
             action=ManualWateringAction(action), duration_s=duration_s
         )
         seq_used = self._seq.current
-        # Security (per P09): authentication + integrity come from the broker —
+        # Security (per P09): authentication + integrity come from the broker -
         # TLS + our P13 credentials + an ACL that only lets P13 publish here (all
         # configured in start()). No app-layer payload signing in P09's model.
         payload = codec.encode(trigger.to_data(self._seq))
@@ -185,7 +185,7 @@ class WateringPublisher:
         )
         info.wait_for_publish(timeout=PUBLISH_TIMEOUT_S)
         if not info.is_published():
-            raise RuntimeError("publish timed out — broker did not acknowledge")
+            raise RuntimeError("publish timed out - broker did not acknowledge")
         log.info(
             "manual watering published: action=%s duration_s=%s seq=%s",
             action,
@@ -211,7 +211,7 @@ class WateringPublisher:
         )
         info.wait_for_publish(timeout=PUBLISH_TIMEOUT_S)
         if not info.is_published():
-            raise RuntimeError("publish timed out — broker did not acknowledge")
+            raise RuntimeError("publish timed out - broker did not acknowledge")
         log.info("auto-watering command published: enabled=%s seq=%s", enabled, seq_used)
         return {"topic": AutoWateringCommandTopic.address, "seq": seq_used}
 

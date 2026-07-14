@@ -6,7 +6,7 @@ import { ref } from 'vue'
 const TOKEN_KEY = 'plantcps_token'
 const ROLE_KEY = 'plantcps_role'
 
-// Reactive auth state — components can watch this
+// Reactive auth state - components can watch this
 export const authState = ref({
   token: localStorage.getItem(TOKEN_KEY),
   role: localStorage.getItem(ROLE_KEY),
@@ -28,7 +28,7 @@ async function request(path, options = {}) {
     },
   })
   if (!res.ok) {
-    // FastAPI returns {"detail": "..."} — surface that as a clean message.
+    // FastAPI returns {"detail": "..."} - surface that as a clean message.
     let detail = await res.text()
     try {
       const parsed = JSON.parse(detail)
@@ -39,7 +39,7 @@ async function request(path, options = {}) {
             : JSON.stringify(parsed.detail)
       }
     } catch {
-      /* response body was not JSON — keep the raw text */
+      /* response body was not JSON - keep the raw text */
     }
     const err = new Error(detail || `Request failed (${res.status})`)
     err.status = res.status
@@ -60,7 +60,7 @@ export async function login(email, password) {
   if (!res.ok) throw new Error('Invalid credentials')
   const { access_token } = await res.json()
 
-  // Token in hand — now fetch /me to discover the role.
+  // Token in hand - now fetch /me to discover the role.
   authState.value = { token: access_token, role: null }
   const me = await fetch('/api/users/me', {
     headers: { Authorization: `Bearer ${access_token}` },
