@@ -36,6 +36,8 @@ from schema.p05 import (
     ManualTriggerCommandTopic,
     ManualWateringAction,
     ManualWateringTrigger,
+    ProfileOverrideCommand,
+    ProfileOverrideCommandTopic,
 )
 from schema.p13 import InfoTopic
 from schema.utils import package_root
@@ -214,6 +216,36 @@ class WateringPublisher:
             raise RuntimeError("publish timed out - broker did not acknowledge")
         log.info("auto-watering command published: enabled=%s seq=%s", enabled, seq_used)
         return {"topic": AutoWateringCommandTopic.address, "seq": seq_used}
+
+    def publish_profile_override(
+        self, key: str, value: float | None = None, clear: bool = False
+    ) -> dict:
+        """Publish P05's ProfileOverrideCommand: runtime override of ONE
+        parameter of the active profile (in-memory on P05, lost on restart).
+        Booleans go on the wire as 0.0/1.0. clear=True reverts the key."""
+        if self._client is None or not self._connected:
+            raise RuntimeError("not connected to the MQTT broker")
+
+        command = ProfileOverrideCommand(key=key, value=value, clear=clear)
+        seq_used = self._seq.current
+        payload = codec.encode(command.to_data(self._seq))
+        info = self._client.publish(
+            ProfileOverrideCommandTopic.address,
+            payload,
+            qos=ProfileOverrideCommandTopic.qos,
+            retain=ProfileOverrideCommandTopic.retain,
+        )
+        info.wait_for_publish(timeout=PUBLISH_TIMEOUT_S)
+        if not info.is_published():
+            raise RuntimeError("publish timed out - broker did not acknowledge")
+        log.info(
+            "profile override published: key=%s value=%r clear=%s seq=%s",
+            key,
+            value,
+            clear,
+            seq_used,
+        )
+        return {"topic": ProfileOverrideCommandTopic.address, "seq": seq_used}
 
 
 watering_publisher = WateringPublisher()

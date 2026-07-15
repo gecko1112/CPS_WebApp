@@ -111,6 +111,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ enabled }),
     }),
+  profileOverride: (key, value, clear = false) =>
+    request('/api/config/watering/override', {
+      method: 'POST',
+      body: JSON.stringify({ key, value, clear }),
+    }),
   wateringHistory: (limit = 20) =>
     request(`/api/watering/history?limit=${limit}`),
   notifyTest: () => request('/api/notify/test', { method: 'POST' }),

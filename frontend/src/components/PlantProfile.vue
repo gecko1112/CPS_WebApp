@@ -15,6 +15,12 @@ const emit = defineEmits(['save'])
 const editable = computed(() => Boolean(props.config?.editable) && props.isOperator)
 const profileNames = computed(() => Object.keys(props.config?.profiles || {}))
 
+// Only some profiles have editable values (the 'custom' one); presets are
+// fixed. Selecting the active profile works for all of them.
+function rowEditable(r) {
+  return editable.value && (props.config?.editable_profiles || []).includes(r.name)
+}
+
 // Simple view: only switch the active plant, no parameter editing.
 function selectActive() {
   emit('save', { active: active.value })
@@ -138,7 +144,7 @@ function save() {
             <td class="py-2 pr-3 capitalize text-white/80 font-medium">{{ r.name }}</td>
             <td class="py-2 pr-3">
               <input
-                v-if="editable"
+                v-if="rowEditable(r)"
                 type="number"
                 step="0.05"
                 min="0"
@@ -153,7 +159,7 @@ function save() {
             </td>
             <td class="py-2 pr-3">
               <input
-                v-if="editable"
+                v-if="rowEditable(r)"
                 type="number"
                 step="0.05"
                 min="0"
@@ -168,7 +174,7 @@ function save() {
             </td>
             <td class="py-2 pr-3">
               <input
-                v-if="editable"
+                v-if="rowEditable(r)"
                 type="number"
                 min="0"
                 v-model.number="r.dry_days"
@@ -181,7 +187,7 @@ function save() {
               <input
                 type="checkbox"
                 v-model="r.suppress_daytime"
-                :disabled="!editable"
+                :disabled="!rowEditable(r)"
                 @change="dirty = true"
                 class="accent-plant-500"
               />
@@ -191,12 +197,12 @@ function save() {
                 <input
                   type="checkbox"
                   v-model="r.suppress_rain"
-                  :disabled="!editable"
+                  :disabled="!rowEditable(r)"
                   @change="dirty = true"
                   class="accent-plant-500"
                 />
                 <input
-                  v-if="editable"
+                  v-if="rowEditable(r)"
                   type="number"
                   min="0"
                   step="1"
@@ -214,11 +220,11 @@ function save() {
         </tbody>
       </table>
 
-      <p v-if="config && !config.editable" class="text-xs text-white/30 mt-2">
-        {{ config.note || 'Profiles are read-only in this mode.' }}
+      <p v-if="!isOperator" class="text-xs text-white/30 mt-2">
+        Operator role required to change profiles.
       </p>
-      <p v-else-if="!isOperator" class="text-xs text-white/30 mt-2">
-        Operator role required to edit profiles.
+      <p v-else-if="config && config.note" class="text-xs text-white/30 mt-2">
+        {{ config.note }}
       </p>
     </div>
   </div>

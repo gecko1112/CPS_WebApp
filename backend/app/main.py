@@ -28,6 +28,7 @@ from .auth import (
 from .email_util import EMAIL_ENABLED, send_email
 from .mock_data import MockSensorService
 from .models import User
+from .profiles import profile_store
 from .schemas import UserCreate, UserRead, UserUpdate
 
 # Data source toggle. Real mode reads from P06's query API and publishes manual
@@ -239,6 +240,60 @@ async def set_auto_watering(
     return {"ok": True, "enabled": req.enabled, "set_by": user.email, **result}
 
 
+class ProfileOverrideRequest(BaseModel):
+    key: str
+    value: float | bool | None = None
+    clear: bool = False
+
+
+@app.post("/api/config/watering/override")
+async def profile_override(
+    req: ProfileOverrideRequest, user: User = Depends(require_operator)
+):
+    """Runtime override of ONE parameter of P05's ACTIVE profile
+    (schema.p05.ProfileOverrideCommand). In-memory on P05, lost on its
+    restart; clear=true reverts the key to the profile's own value.
+    Booleans go on the wire as 0.0/1.0."""
+    value = req.value
+    if isinstance(value, bool):
+        value = 1.0 if value else 0.0
+    if watering_publisher is None:  # demo / mock mode - no broker
+        assert isinstance(sensor_service, MockSensorService)
+        try:
+            result = sensor_service.set_profile_override(req.key, value, req.clear)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+    else:
+        from schema.p05 import validate_profile_override
+
+        if not req.clear:
+            if value is None:
+                raise HTTPException(status_code=400, detail="value is required")
+            try:
+                validate_profile_override(req.key, value)
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+        try:
+            result = watering_publisher.publish_profile_override(
+                req.key, value, req.clear
+            )
+        except RuntimeError as exc:
+            raise HTTPException(
+                status_code=503,
+                detail=f"Profile override could not be sent: {exc}",
+            ) from exc
+        except ValueError as exc:  # schema model validation (bad key, range)
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {
+        "ok": True,
+        "key": req.key,
+        "value": value,
+        "clear": req.clear,
+        "set_by": user.email,
+        **result,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Watering history + plant profile (questionnaire-driven: watering history was
 # the #1 advanced-view ask; plant profiles came from P05).
@@ -251,9 +306,23 @@ async def watering_history(
     return sensor_service.get_watering_history(limit)
 
 
+# Profile catalogue is OWNED BY P13 (see profiles.py): fixed presets + one
+# editable "custom" profile. On every change the active profile's full value
+# set is pushed to P05 as per-key runtime overrides.
+_PROFILE_NOTE_REAL = (
+    "Presets are fixed; edit the 'custom' profile. Changes are pushed to the "
+    "controller as runtime overrides (reset when the controller restarts)."
+)
+_PROFILE_NOTE_DEMO = (
+    "Presets are fixed; edit the 'custom' profile. Demo mode applies changes "
+    "locally."
+)
+
+
 @app.get("/api/config/watering")
 async def watering_config(_: User = Depends(current_active_user)):
-    return sensor_service.get_watering_config()
+    note = _PROFILE_NOTE_DEMO if watering_publisher is None else _PROFILE_NOTE_REAL
+    return profile_store.config(note=note)
 
 
 class WateringConfigUpdate(BaseModel):
@@ -266,14 +335,29 @@ async def update_watering_config(
     req: WateringConfigUpdate, user: User = Depends(require_operator)
 ):
     try:
-        result = sensor_service.update_watering_config(
-            active=req.active, profiles=req.profiles
-        )
+        pairs = profile_store.update(active=req.active, profiles=req.profiles)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except NotImplementedError as exc:
-        raise HTTPException(status_code=501, detail=str(exc)) from exc
-    return {"ok": True, "updated_by": user.email, **result}
+    published = 0
+    if watering_publisher is not None:
+        try:
+            for key, value in pairs:
+                watering_publisher.publish_profile_override(key, value)
+                published += 1
+        except RuntimeError as exc:
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    f"Profile saved, but only {published}/{len(pairs)} values "
+                    f"reached the controller: {exc}"
+                ),
+            ) from exc
+    return {
+        "ok": True,
+        "updated_by": user.email,
+        "active": profile_store.active,
+        "published_overrides": published,
+    }
 
 
 # ---------------------------------------------------------------------------

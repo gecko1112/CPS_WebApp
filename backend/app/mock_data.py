@@ -404,6 +404,49 @@ class MockSensorService:
             )
         return {"topic": "mock://p05/manual_trigger", "seq": self._tick}
 
+    def set_profile_override(
+        self, key: str, value: float | None = None, clear: bool = False
+    ) -> dict:
+        """Demo counterpart of P05's ProfileOverrideCommand: apply a single
+        runtime override to the ACTIVE profile (mirrors P05's validation
+        rules inline - this module stays schema-free by design)."""
+        bool_keys = {"suppress_daytime", "suppress_rain", "suppress_temp"}
+        ranges = {
+            "moist_lower": (0.0, 1.0),
+            "moist_upper": (0.0, 1.0),
+            "dry_days": (0.0, 365.0),
+            "rain_suppress_threshold_mm": (0.0, 200.0),
+        }
+        valid_keys = bool_keys | set(ranges)
+        if key not in valid_keys:
+            raise ValueError(f"unknown override key {key!r}")
+        profile = self.profiles[self.active_profile]
+        if clear:
+            profile[key] = _PLANT_PROFILES[self.active_profile].get(key)
+            return {"topic": "mock://p05/profile_override", "seq": self._tick}
+        if value is None:
+            raise ValueError("value is required")
+        if key in bool_keys:
+            if value not in (0.0, 1.0):
+                raise ValueError(f"value for {key!r} must be 0.0/1.0")
+            profile[key] = bool(value)
+        else:
+            low, high = ranges[key]
+            if not (low <= value <= high):
+                raise ValueError(
+                    f"value for {key!r} must be between {low} and {high}"
+                )
+            if key == "dry_days":
+                if not float(value).is_integer():
+                    raise ValueError("dry_days must be a whole number")
+                value = int(value)
+            lower = profile["moist_lower"] if key != "moist_lower" else value
+            upper = profile["moist_upper"] if key != "moist_upper" else value
+            if key in ("moist_lower", "moist_upper") and upper <= lower:
+                raise ValueError("moist_upper must stay greater than moist_lower")
+            profile[key] = value
+        return {"topic": "mock://p05/profile_override", "seq": self._tick}
+
     def set_auto_watering(self, enabled: bool) -> dict:
         # Demo counterpart of publishing schema.p05.AutoWateringCommand.
         self.auto_watering = enabled

@@ -499,8 +499,10 @@ class P06SensorService:
                 },
             },
             "editable": False,
-            "note": "P05 selects its profile at startup (P05_PROFILE, central "
-            "config); no runtime profile command exists yet.",
+            "overridable": True,
+            "note": "P05 selects its profile at startup (P05_PROFILE). Single "
+            "parameters of the ACTIVE profile can be overridden at runtime "
+            "(in-memory on P05, lost on its restart).",
         }
 
     def update_watering_config(
