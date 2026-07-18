@@ -1,4 +1,4 @@
-// In-app toast store. pushToast() from anywhere; <ToastHost> renders them.
+// In-app toast store. pushToast() adds one and <ToastHost> renders them.
 import { ref } from 'vue'
 
 export const toasts = ref([])

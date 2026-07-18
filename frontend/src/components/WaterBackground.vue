@@ -1,6 +1,6 @@
 <script setup>
 // Greyish / translucent water-droplet backdrop (an alternative to the green
-// blobs). Purely decorative; sits behind the content (which is z-10).
+// blobs). Purely decorative and sits behind the content (which is z-10).
 </script>
 
 <template>

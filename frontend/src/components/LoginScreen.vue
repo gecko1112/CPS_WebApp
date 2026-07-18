@@ -24,8 +24,8 @@ async function submit() {
   loading.value = true
   try {
     if (mode.value === 'register') {
-      // Self-service signup - new accounts are always read-only viewers;
-      // promotion to operator is an explicit admin action.
+      // Self-service signup. New accounts are always read-only viewers.
+      // Promotion to operator is an explicit admin action.
       await register(email.value, password.value)
     }
     await login(email.value, password.value)

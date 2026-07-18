@@ -31,8 +31,8 @@ function timeAgo(iso) {
   return `${Math.floor(mins / 60)}h ago`
 }
 
-// Absolute local time (course requirement: alerts with timestamps).
-// UTC from the backend, converted via Intl; date shown only when not today.
+// Absolute local alert time. UTC from the backend, converted via Intl.
+// The date is only shown when the alert is not from today.
 function fmtTime(iso) {
   const d = new Date(iso)
   const time = new Intl.DateTimeFormat(undefined, {

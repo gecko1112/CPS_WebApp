@@ -15,7 +15,7 @@ const emit = defineEmits(['save'])
 const editable = computed(() => Boolean(props.config?.editable) && props.isOperator)
 const profileNames = computed(() => Object.keys(props.config?.profiles || {}))
 
-// Only some profiles have editable values (the 'custom' one); presets are
+// Only some profiles have editable values (the 'custom' one). Presets are
 // fixed. Selecting the active profile works for all of them.
 function rowEditable(r) {
   return editable.value && (props.config?.editable_profiles || []).includes(r.name)

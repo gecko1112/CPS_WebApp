@@ -15,7 +15,7 @@ const props = defineProps({
 })
 
 // Only annotate events inside the plotted time window (sky tone = water,
-// matching the tank card; dashed line + 💧 so it never relies on color alone).
+// matching the tank card, dashed line + 💧 so it never relies on color alone).
 // The result is reference-memoized: the poll cycle replaces `series` every few
 // seconds, and an unstable reference here would recompute chartOptions and
 // force an ApexCharts updateOptions() (= flicker) on every poll.

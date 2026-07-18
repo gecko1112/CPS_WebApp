@@ -3,12 +3,12 @@
 // Caveats (surfaced to the user in Settings):
 //   - Needs a secure context: works on localhost, and over HTTPS. Plain HTTP on
 //     the LAN (the Pi) blocks the Notification API.
-//   - Android Chrome requires ServiceWorkerRegistration.showNotification(); the
+//   - Android Chrome requires ServiceWorkerRegistration.showNotification(). The
 //     bare `new Notification()` throws there - so we prefer the service worker.
 //   - iOS Safari only allows this once the site is installed to the home screen
 //     (PWA). Until then it reports unsupported.
 //   - True push with the browser fully closed needs the Push API + a push
-//     server - out of scope; this covers backgrounded-tab notifications.
+//     server, which is out of scope. This covers backgrounded-tab notifications.
 import { ref } from 'vue'
 
 export const notificationsSupported =
@@ -32,7 +32,7 @@ export async function enableNotifications() {
 export async function notify(title, body, tag) {
   if (!notificationsSupported || Notification.permission !== 'granted') return
   try {
-    // Prefer the service worker (required on Android); fall back to the ctor.
+    // Prefer the service worker (required on Android), fall back to the ctor.
     if ('serviceWorker' in navigator) {
       const reg = await navigator.serviceWorker.getRegistration()
       if (reg) {

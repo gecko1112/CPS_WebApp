@@ -197,7 +197,7 @@ async def trigger_water(req: WaterRequest, user: User = Depends(require_operator
                 status_code=503,
                 detail=f"Watering command could not be sent: {exc}",
             ) from exc
-    # Stretch: best-effort email notification (fire-and-forget; only sends when
+    # Best-effort email notification (fire-and-forget, only sends when
     # EMAIL_ENABLED). Never blocks or fails the command.
     asyncio.create_task(
         send_email(
@@ -250,7 +250,7 @@ class ProfileOverrideRequest(BaseModel):
 async def profile_override(
     req: ProfileOverrideRequest, user: User = Depends(require_operator)
 ):
-    """Runtime override of ONE parameter of P05's ACTIVE profile
+    """Runtime override of one parameter of P05's active profile
     (schema.p05.ProfileOverrideCommand). In-memory on P05, lost on its
     restart; clear=true reverts the key to the profile's own value.
     Booleans go on the wire as 0.0/1.0."""
@@ -295,8 +295,7 @@ async def profile_override(
 
 
 # ---------------------------------------------------------------------------
-# Watering history + plant profile (questionnaire-driven: watering history was
-# the #1 advanced-view ask; plant profiles came from P05).
+# Watering history + plant profile.
 # ---------------------------------------------------------------------------
 @app.get("/api/watering/history")
 async def watering_history(
@@ -306,7 +305,7 @@ async def watering_history(
     return sensor_service.get_watering_history(limit)
 
 
-# Profile catalogue is OWNED BY P13 (see profiles.py): fixed presets + one
+# The profile catalogue is owned by the web app (see profiles.py). Fixed presets plus one
 # editable "custom" profile. On every change the active profile's full value
 # set is pushed to P05 as per-key runtime overrides.
 _PROFILE_NOTE_REAL = (

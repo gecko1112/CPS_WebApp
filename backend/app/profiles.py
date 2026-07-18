@@ -1,11 +1,11 @@
 """
 P13-owned plant-profile catalogue.
 
-Decision (2026-07-15, agreed with P05): the profile data lives HERE in the
-web app, not in P05. Four FIXED presets (base/cactus/herbs/tomato - value-
+The profile data lives here in the web app, not in P05 (agreed with P05).
+Four fixed presets (base/cactus/herbs/tomato, value-
 identical to P05's shipped central-config profiles) plus exactly ONE editable
 profile, "custom". Whenever something changes - the custom profile's values
-or which profile is active - the ACTIVE profile's full parameter set is
+or which profile is active, the active profile's full parameter set is
 pushed to P05 as per-key runtime overrides (schema.p05.ProfileOverrideCommand,
 in-memory on P05).
 
@@ -16,7 +16,7 @@ reset when the backend restarts, matching the lifetime of P05's overrides.
 from __future__ import annotations
 
 # Parameter bounds - same rules schema.p05.validate_profile_override enforces
-# on the wire (kept in sync manually; the wire is validated again anyway).
+# on the wire. Kept in sync manually, and the wire is validated again anyway.
 _BOOL_KEYS = frozenset({"suppress_daytime", "suppress_rain"})
 _RANGES: dict[str, tuple[float, float]] = {
     "moist_lower": (0.0, 1.0),
@@ -119,9 +119,9 @@ class ProfileStore:
     def update(
         self, active: str | None = None, profiles: dict | None = None
     ) -> list[tuple[str, float]]:
-        """Apply a change (active selection and/or new custom values; edits to
+        """Apply a change (active selection and/or new custom values, where edits to
         fixed presets are ignored - the UI disables them anyway). Returns the
-        ACTIVE profile's full (key, wire-value) list to push to P05."""
+        active profile's full (key, wire-value) list to push to P05."""
         if profiles is not None and "custom" in profiles:
             self.custom = _validate_profile(profiles["custom"])
         if active is not None:

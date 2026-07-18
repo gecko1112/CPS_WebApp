@@ -112,8 +112,8 @@ class PowerState(TypedDict):
 
 class P06SensorService:
     def __init__(self) -> None:
-        # Latest-reading cache. Same keys the frontend already consumes;
-        # initialised to "no data yet" until the first successful poll.
+        # Latest-reading cache. Same keys the frontend already consumes.
+        # Initialised to "no data yet" until the first successful poll.
         self.soil_moisture: SoilMoistureState = {
             "calibrated": None,
             "raw_adc": None,
@@ -200,7 +200,7 @@ class P06SensorService:
         # judged from /health, not from whether a cycle raised.
         #
         # asyncio.gather()'s typeshed overloads only preserve per-argument
-        # types up to 5 awaitables; beyond that it collapses to one shared
+        # types up to 5 awaitables. Beyond that it collapses to one shared
         # TypeVar, so 8 heterogeneous awaitables would type-erase to a union.
         # TaskGroup keeps each task's own return type via Task[T].result().
         async with asyncio.TaskGroup() as tg:
@@ -363,7 +363,7 @@ class P06SensorService:
         )
         if not pts:
             # Aggregator not running (or no aggregates yet) - fall back to raw
-            # points; our max_points step-sampling below bounds the payload.
+            # points. The max_points step-sampling below bounds the payload.
             rows = await self._client.history(topic, hours=hours, downsample=None)
             pts = metric_series(rows, measurement, scale=scale)
         if len(pts) > max_points:
@@ -407,13 +407,13 @@ class P06SensorService:
             ),
             "active_alert_count": n_alerts,
             # Plant health headline. Placeholder until P16 (Plant Health Model)
-            # ships a real score; for now derived from the overall status level.
+            # ships a real score. For now it is derived from the overall status level.
             "plant_health": "needs_attention" if level == "error" else "healthy",
         }
 
     def get_component_health(self) -> list[dict]:
         # Derive liveness from the freshness of each component's latest reading.
-        # P06 is judged by our own connection; P08 is event-driven so it's only
+        # P06 is judged by our own connection. P08 is event-driven, so it is only
         # inferable from a recent alert (else "unknown" -> online=None).
         latest_ts = {
             "p01": self.soil_moisture.get("timestamp"),
@@ -442,7 +442,7 @@ class P06SensorService:
                     "online": online,
                     "last_seen": last,
                     # P07 publishes its own data quality (live/cached/
-                    # unavailable); surface it instead of a bare online dot.
+                    # unavailable). Shown instead of a bare online dot.
                     "status": self.weather.get("status") if cid == "p07" else None,
                 }
             )
@@ -456,12 +456,12 @@ class P06SensorService:
         return []
 
     def get_watering_config(self) -> dict:
-        # EXACT mirror of P05's central-config ``P05ProfileConfig``
+        # Exact mirror of P05's central-config ``P05ProfileConfig``
         # (cps_config.p05 defaults): moist_lower/upper are the bang-bang
         # regulator's soil-moisture bounds. P05 picks its profile at STARTUP
         # via the P05_PROFILE env var - over MQTT it accepts only
         # ManualWateringTrigger and AutoWateringCommand, so there is no
-        # runtime profile editing; read-only is the honest state here.
+        # runtime profile editing. Read-only is the honest state here.
         return {
             "active": None,
             "profiles": {
@@ -508,7 +508,8 @@ class P06SensorService:
     def update_watering_config(
         self, active: str | None = None, profiles: dict | None = None
     ) -> dict:
-        # P05 owns the profiles; editing them needs a P05 command path which
+        # Superseded by profiles.py, which owns the catalogue now. Kept so the
+        # service interface stays complete. Editing here would need a P05 path which
         # isn't wired yet. Fail honestly so the UI shows it's read-only.
         raise NotImplementedError(
             "Editing watering profiles requires a P05 command (not wired yet)."

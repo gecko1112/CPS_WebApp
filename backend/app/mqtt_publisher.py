@@ -1,26 +1,26 @@
 """
 WateringPublisher - the one MQTT write path: manual watering commands to P05.
 
-Reads go through P06's HTTP query API (see p06_client.py); MQTT is used ONLY to
+Reads go through P06's HTTP query API (see p06_client.py). MQTT is used only to
 publish the safety-critical manual-watering command. P13 acts as a minimal
 Sparkplug B node: it registers an NINFO last-will, publishes NINFO online on
 connect, and stamps every command with a wrapping sequence number.
 
-The command is a DCMD to P05's controller device, encoded with the shared
-``cps-schema`` Sparkplug codec. Topic/model come from ``schema.p05`` - never
-hardcoded.
+The commands are DCMDs to P05's controller device, encoded with the shared
+``cps-schema`` Sparkplug codec. Topics and models come from ``schema.p05``
+and are never hardcoded.
 
 Uses paho-mqtt (the convention across the monorepo's publishers). The client
-runs its own network thread (``loop_start``); ``publish_watering`` is called
-from the FastAPI request thread and is safe to do so.
+runs its own network thread (``loop_start``). ``publish_watering`` is called
+from the FastAPI request thread, which is safe.
 
-SECURITY (issue #16, per P09): the broker secures this path - MQTT over TLS +
-our per-component P13 credentials + a broker ACL that only lets P13 publish to
-the watering topic. Username/password come from P13's own auth.env (see
-scripts/setup-workspace.sh, which bootstraps it) via
-schema.mqtt.create_client(); TLS is configured via env (MQTT_TLS*), off by
-default so the local/demo broker works; fill in with P09's values. P09's
-model uses no app-layer payload signing.
+Security follows P09's broker-centric model. The broker secures this path
+with MQTT over TLS, per-component P13 credentials, and an ACL that only lets
+P13 publish to the watering topic. Username/password come from P13's own
+auth.env (bootstrapped by scripts/setup-workspace.sh) via
+schema.mqtt.create_client(). TLS is configured via env (MQTT_TLS*) and stays
+off by default so the local/demo broker works. P09's model uses no app-layer
+payload signing.
 """
 
 from __future__ import annotations
@@ -59,8 +59,8 @@ AUTH_ENV = package_root(__file__) / "auth.env"
 # P09's model is broker-centric: MQTT over TLS + per-component credentials +
 # per-component ACLs (the broker enforces that only P13 may publish to the
 # watering DCMD topic). Username/password come from AUTH_ENV via
-# create_client(); all off by default (no password set) so the local/demo
-# broker still works.
+# create_client(). All of it is off by default (no password set) so the
+# local/demo broker still works.
 USE_TLS = os.getenv("MQTT_TLS", "false").lower() in ("1", "true", "yes", "on")
 TLS_CA = os.getenv("MQTT_TLS_CA") or None  # CA cert to trust (from P09)
 TLS_CERT = os.getenv("MQTT_TLS_CERT") or None  # client cert (only if mTLS)
@@ -96,7 +96,7 @@ class WateringPublisher:
         client.on_disconnect = self._on_disconnect
 
         # MQTT over TLS (P09's secured broker). tls_set() with ca_certs=None uses
-        # the system trust store; pass P09's CA via MQTT_TLS_CA. certfile/keyfile
+        # the system trust store. Pass P09's CA via MQTT_TLS_CA. certfile/keyfile
         # enable mTLS if P09 requires client certificates.
         if USE_TLS:
             try:
@@ -175,8 +175,8 @@ class WateringPublisher:
             action=ManualWateringAction(action), duration_s=duration_s
         )
         seq_used = self._seq.current
-        # Security (per P09): authentication + integrity come from the broker -
-        # TLS + our P13 credentials + an ACL that only lets P13 publish here (all
+        # Authentication and integrity come from the broker (TLS, our P13
+        # credentials, and an ACL that only lets P13 publish here, all
         # configured in start()). No app-layer payload signing in P09's model.
         payload = codec.encode(trigger.to_data(self._seq))
         info = self._client.publish(

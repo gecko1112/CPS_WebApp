@@ -1,6 +1,6 @@
 <script setup>
 // A little "plant-leaf" explainer bubble. Place inside a parent that has the
-// `group relative` classes; an info dot shows in the corner and the bubble
+// `group relative` classes. An info dot shows in the corner and the bubble
 // reveals on hover/focus.
 import { Info } from 'lucide-vue-next'
 

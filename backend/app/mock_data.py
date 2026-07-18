@@ -92,7 +92,7 @@ _WEATHER_SCENARIOS = [
 ]
 
 
-# Plant watering profiles - EXACT mirror of P05's central-config
+# Plant watering profiles, an exact mirror of P05's central-config
 # ``P05ProfileConfig`` (cps_config.p05): moist_lower/moist_upper are the
 # bang-bang regulator's soil-moisture bounds (0-1, upper > lower), dry_days =
 # min days between waterings, suppress_daytime = water at night only,
@@ -216,8 +216,8 @@ class MockSensorService:
         self._tick = 0
         self._offline_component: str | None = None  # one component "drops" now and then
 
-        # Plant profile (owned by P05; we only display + forward edits). In demo
-        # mode we keep an editable in-memory copy so the UI is fully functional.
+        # Plant profile display values. Demo mode keeps an editable
+        # in-memory copy so the UI is fully functional.
         self.active_profile = "tomato"
         self.profiles = {name: dict(v) for name, v in _PLANT_PROFILES.items()}
         self.auto_watering = True
@@ -301,7 +301,7 @@ class MockSensorService:
                         "precipitation_mm": round(precip, 1),
                         "solar_radiation_wm2": round(solar, 0),
                         "confidence": round(random.uniform(0.6, 0.95), 2),
-                        # P07's own data-quality field; mostly live, sometimes
+                        # P07's own data-quality field. Mostly live, sometimes
                         # cached so the advanced view visibly changes.
                         "status": random.choice(["live", "live", "live", "cached"]),
                         "timestamp": now,
@@ -466,8 +466,8 @@ class MockSensorService:
                 "label": label,
                 "online": cid != self._offline_component,
                 "last_seen": None if cid == self._offline_component else now,
-                # P07 publishes its own data quality (live/cached/unavailable);
-                # surface it instead of a bare online/offline dot.
+                # P07 publishes its own data quality (live/cached/unavailable).
+                # Shown instead of a bare online/offline dot.
                 "status": self.weather["status"] if cid == "p07" else None,
             }
             for cid, label in COMPONENTS
@@ -486,7 +486,7 @@ class MockSensorService:
     def update_watering_config(
         self, active: str | None = None, profiles: dict | None = None
     ) -> dict:
-        # In real mode this would publish to P05; in demo mode we just apply it
+        # In real mode this would publish to P05. In demo mode it is applied
         # locally so operators can see selection + value edits take effect.
         if profiles is not None:
             self.profiles = profiles
@@ -551,8 +551,8 @@ class MockSensorService:
             ),
             "active_alert_count": n_alerts,
             # Plant health headline pinned to "healthy" in demo mode (P16 is
-            # vacant - placeholder per the presentation plan). The status
-            # banner still reacts to the demo alerts; the plant itself is fine.
+            # vacant, so there is no real data source for it). The status
+            # banner still reacts to the demo alerts. The plant itself is fine.
             "plant_health": "healthy",
             "demo_mode": True,
         }
